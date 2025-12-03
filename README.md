@@ -9,6 +9,7 @@ Reusable prompts for common development tasks. Run with `/prompt-name` in chat.
 | Prompt | Description |
 |--------|-------------|
 | [Migration Orchestrator](prompts/migration-orchestrator.prompt.md) | Large-scale migrations with progress tracking and rollback |
+| [Prompt Crafter](prompts/prompt-crafter.prompt.md) | Interactive assistant for creating well-structured .prompt.md files |
 
 ## Instructions (`.instructions.md`)
 
