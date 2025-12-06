@@ -1,6 +1,5 @@
 ---
 description: Remove a Git worktree and optionally delete its associated branch
-tools: terminal
 ---
 
 # Git Delete Worktree

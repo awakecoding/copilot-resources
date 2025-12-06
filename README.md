@@ -9,6 +9,8 @@ Reusable prompts for common development tasks. Run with `/prompt-name` in chat.
 | Prompt | Description |
 |--------|-------------|
 | [Git Create Logical Commits](prompts/git-create-logical-commits.prompt.md) | Create atomic, well-organized commits from unstaged changes |
+| [Git Create Worktree](prompts/git-create-worktree.prompt.md) | Create a new Git worktree with proper naming conventions and branch setup |
+| [Git Delete Worktree](prompts/git-delete-worktree.prompt.md) | Remove a Git worktree and optionally delete its associated branch |
 | [Git Unstage Branch Commits](prompts/git-unstage-branch-commits.prompt.md) | Recreate branch changes as unstaged edits on a fresh branch |
 | [Long-Plan Orchestrator](prompts/long-plan-orchestrator.prompt.md) | Multi-phase project execution with dependency management and progress tracking |
 | [Migration Orchestrator](prompts/migration-orchestrator.prompt.md) | Large-scale migrations with progress tracking and rollback |

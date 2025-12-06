@@ -1,6 +1,5 @@
 ---
 description: Create a new Git worktree with proper naming conventions and branch setup
-tools: terminal
 ---
 
 # Git Create Worktree
