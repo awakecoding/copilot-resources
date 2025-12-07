@@ -21,8 +21,8 @@ When you generate a project plan, you'll create this structure:
 .plan/
 ├── execute.prompt.md           # ← Your entry point (run this repeatedly)
 ├── plan.md                      # ← Master plan (generated once)
-├── state.json                   # ← Current progress
-├── tasks.json                   # ← All tasks to complete
+├── state.yaml                   # ← Current progress
+├── tasks.yaml                   # ← All tasks to complete
 └── phases/
     ├── phase-001.md
     ├── phase-002.md
@@ -49,9 +49,13 @@ You are an **experienced project architect and engineering lead** specializing i
 
 You are creating a structured project plan with multiple phases that can be executed incrementally over time.
 
-## Input Required
+## Planning Process
 
-Before generating the plan, gather this information from the user:
+### Step 1: Information Gathering (Interactive & Clarifying)
+
+Before generating the plan, engage with the user to gather comprehensive context. **DO NOT proceed immediately** - instead, ask clarifying questions to ensure the plan is well-structured.
+
+**Required Information:**
 
 1. **Project Name**: What are we building/doing? (e.g., "API v2 Refactoring")
 2. **Project Goal**: What's the end objective? (1-2 sentences)
@@ -61,14 +65,80 @@ Before generating the plan, gather this information from the user:
 6. **Success Criteria**: How do we know when we're done?
 7. **Constraints**: Any technical constraints, deadlines, or dependencies?
 
+### Step 2: Intelligent Clarification
+
+After receiving initial information, **actively identify ambiguities and suggest options**:
+
+**Architecture & Approach Questions:**
+- "I see you want to refactor the API. Should we use a **strangler fig pattern** (gradual migration) or a **big-bang rewrite**? I'd recommend strangler fig for lower risk."
+- "For the database migration, should we prioritize **zero-downtime** (more complex) or **maintenance window** (simpler)? Zero-downtime is safer for production."
+- "Should we handle backward compatibility, or can we make breaking changes? I suggest maintaining compatibility for at least one major version."
+
+**Scope & Boundary Questions:**
+- "You mentioned authentication - does this include **SSO integration**, or just basic auth? SSO would add 5-7 tasks."
+- "Are we including **monitoring and observability** in this project, or handling that separately? I recommend including it (3-4 tasks)."
+- "Should we plan for **rollback procedures** in case of issues? Highly recommended for production changes."
+
+**Dependency & Risk Questions:**
+- "I see frontend and backend work - should these be **parallel phases** or **sequential**? Parallel is faster but needs coordination."
+- "Are there external dependencies (3rd party APIs, team approvals)? These could become blockers."
+- "What's the risk tolerance - should we add **proof-of-concept tasks** before full implementation?"
+
+**Quality & Testing Questions:**
+- "What testing coverage do you want - **unit tests only** or **integration + E2E tests**? I suggest at least unit + integration."
+- "Should we include **performance testing** tasks? Recommended for API work."
+- "Do you need **security review** tasks built in?"
+
+**Format Response as:**
+```
+📋 Based on your input, I have a few questions to refine the plan:
+
+**Critical Decisions:**
+1. [Question with 2-3 options and your recommendation]
+2. [Question with 2-3 options and your recommendation]
+
+**Scope Clarifications:**
+- [Question about included/excluded items]
+- [Question about edge cases or special scenarios]
+
+**Risk Considerations:**
+- [Question about failure handling]
+- [Question about dependencies or blockers]
+
+Please answer these, or reply "proceed with defaults" to use my recommendations.
+```
+
+### Step 3: Plan Generation
+
+Only after clarifications are addressed (or user says "proceed"), generate the complete plan.
+
+### Guidelines for Effective Clarification
+
+**DO:**
+- ✅ Ask 3-5 targeted questions (not 10+)
+- ✅ Provide 2-3 concrete options for each question
+- ✅ Make a clear recommendation with reasoning
+- ✅ Group questions by category (architecture, scope, risk)
+- ✅ Identify potential blockers or hidden complexity
+- ✅ Suggest best practices based on project type
+
+**DON'T:**
+- ❌ Ask obvious questions if context is clear
+- ❌ Overwhelm with too many questions at once
+- ❌ Ask questions without providing options
+- ❌ Proceed to generation without addressing ambiguities
+- ❌ Make recommendations without explaining why
+
 ## Constraints
 
-- Must create exactly 4 file types: plan.md, state.json, tasks.json, and phase files
+- Must create exactly 4 file types: plan.md, state.yaml, tasks.yaml, and phase files
 - Phase size should be logical groupings (not arbitrary numbers)
 - All generated files must use `.plan/` directory structure
-- JSON files must be valid, parsable, and properly formatted
+- YAML files must be valid and properly formatted (no trailing comma issues)
+- Use whitespace-based indentation (2 spaces recommended for YAML)
 - Must include rollback/contingency procedures where applicable
-- Cannot proceed without all required inputs from user
+- Must ask clarifying questions before generating plan (unless user says "skip questions")
+- Cannot proceed without addressing key ambiguities
 - File paths must be relative to workspace root
 - ISO timestamps must be in RFC 3339 format
 - Phase numbers must use zero-padded format (001, 002, etc.)
@@ -227,103 +297,93 @@ Project is complete when:
 3. Execute repeatedly until completion
 ```
 
-### File 2: .plan/tasks.json
+### File 2: .plan/tasks.yaml
 
 Create complete inventory of all tasks:
 
-```json
-{
-  "project_name": "{Project Name}",
-  "created": "{ISO timestamp}",
-  "total_tasks": {N},
-  "total_phases": {M},
-  "tasks": [
-    {
-      "id": "TASK-001",
-      "phase": 1,
-      "title": "{Short task title}",
-      "description": "{Detailed description}",
-      "acceptance_criteria": [
-        "{Criterion 1}",
-        "{Criterion 2}"
-      ],
-      "dependencies": [],
-      "risk": "low",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "commit": null,
-      "notes": "",
-      "files_affected": [],
-      "estimated_hours": {X}
-    },
-    {
-      "id": "TASK-002",
-      "phase": 1,
-      "title": "{Short task title}",
-      "description": "{Detailed description}",
-      "acceptance_criteria": [
-        "{Criterion 1}",
-        "{Criterion 2}"
-      ],
-      "dependencies": ["TASK-001"],
-      "risk": "medium",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "commit": null,
-      "notes": "",
-      "files_affected": [],
-      "estimated_hours": {X}
-    }
-    // ... all {N} tasks
-  ]
-}
+```yaml
+project_name: "{Project Name}"
+created: "{ISO timestamp}"
+total_tasks: {N}
+total_phases: {M}
+
+tasks:
+  - id: TASK-001
+    phase: 1
+    title: "{Short task title}"
+    description: "{Detailed description}"
+    acceptance_criteria:
+      - "{Criterion 1}"
+      - "{Criterion 2}"
+    dependencies: []
+    risk: low
+    status: pending
+    started_at: null
+    completed_at: null
+    notes: ""
+    files_affected: []
+    estimated_hours: {X}
+  
+  - id: TASK-002
+    phase: 1
+    title: "{Short task title}"
+    description: "{Detailed description}"
+    acceptance_criteria:
+      - "{Criterion 1}"
+      - "{Criterion 2}"
+    dependencies:
+      - TASK-001
+    risk: medium
+    status: pending
+    started_at: null
+    completed_at: null
+    notes: ""
+    files_affected: []
+    estimated_hours: {X}
+  
+  # ... all {N} tasks
 ```
 
-### File 3: .plan/state.json
+### File 3: .plan/state.yaml
 
 Create initial state tracker:
 
-```json
-{
-  "project_name": "{Project Name}",
-  "current_phase": 1,
-  "overall_status": "not_started",
-  "started_at": null,
-  "phases": [
-    {
-      "id": 1,
-      "name": "{Phase 1 Name}",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks_total": {X},
-      "tasks_completed": 0,
-      "blocked": false,
-      "blocker_reason": null
-    },
-    {
-      "id": 2,
-      "name": "{Phase 2 Name}",
-      "status": "pending",
-      "started_at": null,
-      "completed_at": null,
-      "tasks_total": {Y},
-      "tasks_completed": 0,
-      "blocked": false,
-      "blocker_reason": null
-    }
-    // ... all phases
-  ],
-  "tasks_total": {N},
-  "tasks_completed": 0,
-  "tasks_in_progress": 0,
-  "tasks_blocked": 0,
-  "last_updated": "{ISO timestamp}",
-  "last_commit": null,
-  "notes": []
-}
+```yaml
+project_name: "{Project Name}"
+current_phase: 1
+overall_status: not_started
+started_at: null
+
+phases:
+  - id: 1
+    name: "{Phase 1 Name}"
+    status: pending
+    started_at: null
+    completed_at: null
+    tasks_total: {X}
+    tasks_completed: 0
+    blocked: false
+    blocker_reason: null
+  
+  - id: 2
+    name: "{Phase 2 Name}"
+    status: pending
+    started_at: null
+    completed_at: null
+    tasks_total: {Y}
+    tasks_completed: 0
+    blocked: false
+    blocker_reason: null
+  
+  # ... all phases
+
+tasks_total: {N}
+tasks_completed: 0
+tasks_in_progress: 0
+tasks_blocked: 0
+last_updated: "{ISO timestamp}"
+last_commit: null
+notes: []
 ```
 
 ### File 4: .plan/phases/phase-{NNN}.md (Generate for each phase)
@@ -411,7 +471,7 @@ If this phase fails or needs to be reverted:
 
 ---
 
-**After Completion**: Update state.json to mark phase complete and transition to Phase {N+1}
+**After Completion**: Update state.yaml to mark phase complete and transition to Phase {N+1}
 ```
 
 ## Post-Generation Instructions
@@ -433,8 +493,8 @@ After generating all files:
 ## Notes
 
 - Phase files contain detailed task breakdowns and implementation guidance
-- tasks.json is the source of truth for individual task status
-- state.json tracks high-level progress across all phases
+- tasks.yaml is the source of truth for individual task status
+- state.yaml tracks high-level progress across all phases
 - All files work together to enable resumable, incremental execution
 - The executor handles task dependencies automatically
 ```
@@ -448,7 +508,6 @@ After generating all files:
 ```markdown
 ---
 description: Entry point for project execution - run repeatedly until complete
-tools: [read_file, replace_string_in_file, multi_replace_string_in_file, create_file, run_in_terminal, list_dir, semantic_search, grep_search]
 agent: edit
 argument-hint: "Optional: specific task ID to work on, or leave empty for automatic selection"
 ---
@@ -462,9 +521,9 @@ This is the **entry point** for project execution. Run this prompt repeatedly to
 ## Step 1: Load Current State
 
 Read these files to understand current progress:
-- `#file:.plan/state.json` - Current phase and overall progress
+- `#file:.plan/state.yaml` - Current phase and overall progress
 - `#file:.plan/plan.md` - Master plan with phase checkboxes
-- `#file:.plan/tasks.json` - Individual task details and status
+- `#file:.plan/tasks.yaml` - Individual task details and status
 
 ## Constraints
 
@@ -472,11 +531,10 @@ Read these files to understand current progress:
 - NEVER skip dependencies - blocked tasks cannot be started
 - NEVER mark incomplete tasks as completed
 - MUST create git commits after each task completion
-- MUST update state.json and tasks.json before proceeding to next task
+- MUST update state.yaml and tasks.yaml before proceeding to next task
 - MUST verify acceptance criteria before marking task complete
-- MUST wait for user confirmation before starting any work
 - MUST stop execution immediately on any error and report clearly
-- MUST preserve exact formatting when updating JSON files
+- MUST preserve exact whitespace and indentation when updating YAML files
 - MUST follow phase sequence - cannot skip ahead
 - Cannot start a phase until previous phase is 100% complete
 
@@ -484,7 +542,7 @@ Read these files to understand current progress:
 
 Based on loaded files:
 
-1. **Identify Current Phase**: Check `state.json` → `current_phase`
+1. **Identify Current Phase**: Check `state.yaml` → `current_phase`
 2. **Find Available Tasks**: Tasks in current phase with:
    - `status == "pending"`
    - All dependencies completed
@@ -518,60 +576,37 @@ If no tasks available in current phase:
 
 ### Pre-Execution
 
-1. **Load Task Details** from tasks.json:
+1. **Load Task Details** from tasks.yaml:
    - Title, description, acceptance criteria
    - Files affected, estimated time
    - Dependencies, risk level
 
 2. **Display Task Info** to user:
    ```
-   ╔═══════════════════════════════════════════════════════╗
-   ║              TASK EXECUTION PLAN                      ║
-   ╚═══════════════════════════════════════════════════════╝
-   
-   Task ID: {task_id}
-   Title: {title}
-   Phase: {phase_number} - {phase_name}
-   Risk: {risk_level}
-   
-   Description:
+   ➡️ TASK: {task_id} - {title} (Phase {phase_number}/{total_phases})
    {description}
    
    Acceptance Criteria:
    - {criterion 1}
    - {criterion 2}
-   - {criterion 3}
    
-   Dependencies: {list or "None"}
-   Estimated Time: {hours}
-   
-   Files Likely Affected:
-   - {file 1}
-   - {file 2}
-   
-   ═══════════════════════════════════════════════════════
-   
-   Proceed with this task? (yes/no)
+   Dependencies: {list or "None"} | Est: {hours}h | Risk: {risk_level}
    ```
 
-3. **Wait for Confirmation**: Do not proceed without explicit "yes"
+3. **Proceed Automatically**: Begin task execution immediately
 
 ### Execution
 
 1. **Mark Task In-Progress**:
-   - Update tasks.json:
-     ```json
-     {
-       "status": "in_progress",
-       "started_at": "{ISO timestamp}"
-     }
+   - Update tasks.yaml (find the task by id and update):
+     ```yaml
+     status: in_progress
+     started_at: "{ISO timestamp}"
      ```
-   - Update state.json:
-     ```json
-     {
-       "tasks_in_progress": {increment by 1},
-       "last_updated": "{ISO timestamp}"
-     }
+   - Update state.yaml:
+     ```yaml
+     tasks_in_progress: {increment by 1}
+     last_updated: "{ISO timestamp}"
      ```
 
 2. **Perform the Work**:
@@ -589,24 +624,20 @@ If no tasks available in current phase:
    - Check for regressions
 
 4. **Mark Task Complete**:
-   - Update tasks.json:
-     ```json
-     {
-       "status": "completed",
-       "completed_at": "{ISO timestamp}",
-       "commit": "{will be added after commit}",
-       "files_affected": ["{actual files changed}"]
-     }
+   - Update tasks.yaml (find the task by id and update):
+     ```yaml
+     status: completed
+     completed_at: "{ISO timestamp}"
+     files_affected:
+       - "{actual files changed}"
      ```
-   - Update state.json:
-     ```json
-     {
-       "tasks_completed": {increment by 1},
-       "tasks_in_progress": {decrement by 1},
-       "last_updated": "{ISO timestamp}"
-     }
+   - Update state.yaml:
+     ```yaml
+     tasks_completed: {increment by 1}
+     tasks_in_progress: {decrement by 1}
+     last_updated: "{ISO timestamp}"
      ```
-   - Update phase tasks_completed in state.json
+   - Update phase tasks_completed in state.yaml
    - Mark task [x] in plan.md
 
 5. **Create Git Commit**:
@@ -626,13 +657,6 @@ If no tasks available in current phase:
    - {criterion 3}"
    ```
 
-6. **Update Commit Hash** in tasks.json:
-   ```json
-   {
-     "commit": "{commit_hash}"
-   }
-   ```
-
 ## Step 5: Check Phase Completion
 
 After completing a task, check if the current phase is complete:
@@ -649,23 +673,20 @@ After completing a task, check if the current phase is complete:
    ### Phase {N}: {Name} ✅
    ```
 
-2. Update state.json:
-   ```json
-   {
-     "current_phase": {increment by 1 or null if last phase},
-     "phases": [
-       {
-         "id": {N},
-         "status": "completed",
-         "completed_at": "{ISO timestamp}"
-       },
-       {
-         "id": {N+1},
-         "status": "in_progress",
-         "started_at": "{ISO timestamp}"
-       }
-     ]
-   }
+2. Update state.yaml:
+   ```yaml
+   current_phase: {increment by 1 or null if last phase}
+   
+   # Update the completed phase
+   phases:
+     - id: {N}
+       status: completed
+       completed_at: "{ISO timestamp}"
+     
+     # Update the next phase
+     - id: {N+1}
+       status: in_progress
+       started_at: "{ISO timestamp}"
    ```
 
 3. Create phase completion commit:
@@ -678,17 +699,7 @@ After completing a task, check if the current phase is complete:
 
 4. Report phase completion:
    ```
-   ╔═══════════════════════════════════════════════════════╗
-   ║         🎉 PHASE {N} COMPLETE 🎉                      ║
-   ╚═══════════════════════════════════════════════════════╝
-   
-   Phase: {phase_name}
-   Tasks Completed: {X}
-   Duration: {time since phase started}
-   
-   Next Phase: {next_phase_name}
-   
-   Run this prompt again to continue.
+   🎉 Phase {N} complete: {phase_name} | {X} tasks | Next: {next_phase_name}
    ```
 
 ## Step 6: Check Project Completion
@@ -741,8 +752,8 @@ When all phases complete:
 3. Clean up planning files:
    ```bash
    rm -rf .plan/phases/
-   rm .plan/state.json
-   rm .plan/tasks.json
+   rm .plan/state.yaml
+   rm .plan/tasks.yaml
    rm .plan/execute.prompt.md
    ```
 
@@ -757,47 +768,18 @@ When all phases complete:
 
 5. Report project completion:
    ```
-   ╔═══════════════════════════════════════════════════════╗
-   ║      ✅ PROJECT COMPLETE ✅                           ║
-   ╚═══════════════════════════════════════════════════════╝
-   
-   Project: {project_name}
-   Duration: {total duration}
-   Tasks: {N} completed
-   Phases: {M} completed
-   
-   All work finished successfully!
-   
-   Plan archived at:
-   docs/completed-plans/{project-slug}-{date}.md
-   
-   Planning files cleaned up.
-   
-   {Project Name} is ready! 🚀
+   ✅ PROJECT COMPLETE: {project_name} | {N} tasks | {M} phases | {total duration}
+   Archived: docs/completed-plans/{project-slug}-{date}.md
    ```
 
 ## Step 7: Report Status
 
-After every execution, provide detailed status:
+After every execution, provide concise status:
 
 ```
-╔═══════════════════════════════════════════════════════╗
-║              PROJECT STATUS REPORT                    ║
-╚═══════════════════════════════════════════════════════╝
-
-Project: {project_name}
-Overall Status: {not_started/in_progress/completed}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Progress Overview:
-  Tasks: {completed}/{total} ({percentage}%)
-  [████████████░░░░░░░░] 
-
-  Phases: {completed}/{total}
-  Current Phase: {current_phase_name}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 {project_name} | Tasks: {completed}/{total} ({percentage}%) | Phase: {current_phase}/{total_phases}
+Last Action: {brief description}
+Next: {Run again to continue | Project complete}
 
 Phase Details:
 
@@ -821,7 +803,7 @@ Blockers: {count or "None"}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 To continue: Run this prompt again
-To check details: Read .plan/state.json or .plan/plan.md
+To check details: Read .plan/state.yaml or .plan/plan.md
 ```
 
 ## Important Rules
@@ -833,8 +815,8 @@ To check details: Read .plan/state.json or .plan/plan.md
 - ✅ Show dependency chain: "TASK-010 requires TASK-005, which requires TASK-001"
 
 ### Progress Tracking
-- ✅ ALWAYS update tasks.json after completing each task
-- ✅ ALWAYS update state.json to reflect current progress
+- ✅ ALWAYS update tasks.yaml after completing each task
+- ✅ ALWAYS update state.yaml to reflect current progress
 - ✅ ALWAYS mark checkboxes [x] in plan.md
 - ✅ ALWAYS create commits with descriptive messages
 - ✅ NEVER skip tasks or phases
@@ -851,21 +833,11 @@ To check details: Read .plan/state.json or .plan/plan.md
 If you encounter an error, STOP immediately and provide structured error report:
 
 ```
-╔═══════════════════════════════════════════════════════╗
-║                  ERROR ENCOUNTERED                    ║
-╚═══════════════════════════════════════════════════════╝
-
-Task: {task_id} - {title}
-Phase: {phase_number} - {phase_name}
+❌ ERROR: {task_id} - {brief description}
 File: {file path if applicable}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-What Failed:
-{Specific action that failed}
-
-Root Cause:
-{Why it failed - be specific and technical}
+Cause: {why it failed}
+Action: {what needs to be done}
+```
 
 Impact:
 {What's blocked by this failure}
@@ -881,33 +853,31 @@ Alternative Approaches:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Task Status: Marked as BLOCKED in state.json
+Task Status: Marked as BLOCKED in state.yaml
 Blocker Reason: {brief description}
 
 Resume Instructions:
-After fixing the issue, update state.json to unblock the task,
+After fixing the issue, update state.yaml to unblock the task,
 then run this prompt again to retry.
 
 No changes have been committed.
 ```
 
 **Blocking a Task**:
-- Update tasks.json:
-  ```json
-  {
-    "status": "blocked",
-    "notes": "{blocker description}"
-  }
+- Update tasks.yaml (find the task by id):
+  ```yaml
+  status: blocked
+  notes: "{blocker description}"
   ```
-- Update state.json:
-  ```json
-  {
-    "tasks_blocked": {increment by 1},
-    "phases": [{
-      "blocked": true,
-      "blocker_reason": "{task_id}: {brief reason}"
-    }]
-  }
+- Update state.yaml:
+  ```yaml
+  tasks_blocked: {increment by 1}
+  
+  # Update the corresponding phase
+  phases:
+    - id: {phase_id}
+      blocked: true
+      blocker_reason: "{task_id}: {brief reason}"
   ```
 
 ### Resumability
@@ -986,8 +956,8 @@ Run this prompt again to continue
 
 This creates:
 - `.plan/plan.md` - Master plan document
-- `.plan/state.json` - Progress tracker
-- `.plan/tasks.json` - All tasks with dependencies
+- `.plan/state.yaml` - Progress tracker
+- `.plan/tasks.yaml` - All tasks with dependencies
 - `.plan/phases/phase-*.md` - Detailed phase plans
 - `.plan/execute.prompt.md` - Execution entry point
 
@@ -998,7 +968,7 @@ This creates:
 Get-Content .plan/plan.md
 
 # Review task structure
-Get-Content .plan/tasks.json | ConvertFrom-Json | ForEach-Object { $_.tasks } | Format-Table id,title,phase,risk
+Get-Content .plan/tasks.yaml | ConvertFrom-Yaml | ForEach-Object { $_.tasks } | Format-Table id,title,phase,risk
 
 # Commit the plan
 git add .plan/
@@ -1031,7 +1001,7 @@ git commit -m "chore(planning): initialize API v2 Refactoring plan"
                ▼
 ┌─────────────────────────────────────────┐
 │  2. Review & Adjust Plan                │
-│     (read plan.md, tasks.json)          │
+│     (read plan.md, tasks.yaml)          │
 │     (verify dependencies)               │
 └──────────────┬──────────────────────────┘
                │
@@ -1073,14 +1043,14 @@ git commit -m "chore(planning): initialize API v2 Refactoring plan"
 - Reference for understanding project structure
 - Living document that gets updated as work progresses
 
-#### .plan/state.json
+#### .plan/state.yaml
 - Machine-readable state tracker
 - Current phase and overall progress
 - Phase status and completion tracking
 - Source of truth for where we are
 - Updated automatically after each task
 
-#### .plan/tasks.json
+#### .plan/tasks.yaml
 - Complete list of all tasks
 - Dependencies between tasks
 - Acceptance criteria for each task
@@ -1160,7 +1130,7 @@ Multiple views of progress:
 3. **Be explicit about dependencies**: Don't assume - declare all dependencies
 4. **Write clear acceptance criteria**: Make success measurable
 5. **Review after each task**: The one-task-per-execution limit is a feature, not a bug
-6. **Update the plan**: If you discover new tasks, add them to tasks.json
+6. **Update the plan**: If you discover new tasks, add them to tasks.yaml
 7. **Use notes fields**: Track learnings and context in the notes
 8. **Commit frequently**: Each task gets a commit - this is intentional
 9. **Monitor for blockers**: Address blockers quickly to keep momentum
@@ -1176,12 +1146,12 @@ Multiple views of progress:
 #### "Task has incomplete dependencies"
 - Review the dependency chain
 - Check if dependency tasks actually completed
-- Verify tasks.json has correct status for dependencies
+- Verify tasks.yaml has correct status for dependencies
 
 #### "Phase won't complete"
 - Check for tasks with status "in_progress" that never finished
 - Look for blocked tasks preventing phase completion
-- Manually review tasks.json for inconsistencies
+- Manually review tasks.yaml for inconsistencies
 
 #### "Executor selected wrong task"
 - You can override by specifying task ID: run with "TASK-XXX"
@@ -1192,9 +1162,9 @@ Multiple views of progress:
 
 The system is designed to be extensible:
 
-- **Add custom task types**: Extend tasks.json schema
+- **Add custom task types**: Extend tasks.yaml schema
 - **Add phase types**: Create custom phase templates
-- **Add reporting**: Generate custom reports from state.json
+- **Add reporting**: Generate custom reports from state.yaml
 - **Add notifications**: Hook into task completion events
 - **Add metrics**: Track velocity, cycle time, etc.
 
@@ -1216,7 +1186,7 @@ You now have:
 1. Save the plan generator prompt
 2. Run it to create your project plan
 3. Execute the project by running the entry point repeatedly
-4. Monitor progress through state.json or status reports
+4. Monitor progress through state.yaml or status reports
 5. Complete one task at a time until project is done
 
 The system is designed to handle complex, long-running projects with many dependencies, ensuring nothing is forgotten and progress is always tracked!
