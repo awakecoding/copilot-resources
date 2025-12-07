@@ -30,7 +30,7 @@ Utility scripts for managing Copilot resources.
 
 | Script | Description |
 |--------|-------------|
-| [Sync-VSCodeUserPrompts.ps1](scripts/Sync-VSCodeUserPrompts.ps1) | Synchronizes prompt files to all VS Code user profiles (Stable and Insiders) |
+| [Sync-VSCodeUserPrompts.ps1](scripts/Sync-VSCodeUserPrompts.ps1) | Synchronizes prompt files to VS Code profiles, Cursor IDE, and Claude Code |
 
 ### Usage
 
@@ -42,4 +42,9 @@ Utility scripts for managing Copilot resources.
 .\scripts\Sync-VSCodeUserPrompts.ps1 -DryRun
 ```
 
-The script automatically detects VS Code profile locations based on your operating system (Windows, macOS, or Linux) and copies all `.prompt.md` files from the workspace to both Stable and Insiders editions.
+The script automatically detects and synchronizes prompts to:
+- **VS Code** (Stable and Insiders) - Copies `.prompt.md` files to user profile prompts directories
+- **Cursor IDE** - Copies as `.md` files to `~/.cursor/commands` (if `~/.cursor` exists)
+- **Claude Code** - Copies as `.md` files to `~/.claude/commands` (if `~/.claude` exists)
+
+Works across Windows, macOS, and Linux.
