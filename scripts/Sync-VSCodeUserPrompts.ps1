@@ -1,13 +1,14 @@
 <#
 .SYNOPSIS
-    Synchronizes prompt files from workspace to VS Code user profiles and Cursor IDE.
+    Synchronizes prompt files from workspace to VS Code user profiles, Cursor IDE, and Claude Code.
 
 .DESCRIPTION
     Copies all .prompt.md files from the workspace prompts directory to the prompts
-    folder of all VS Code user profiles and to Cursor IDE's commands directory.
+    folder of all VS Code user profiles and to Cursor IDE and Claude Code commands directories.
     
     VS Code: Files are copied as .prompt.md to profile prompts directories
     Cursor IDE: Files are copied as .md to ~/.cursor/commands directory
+    Claude Code: Files are copied as .md to ~/.claude/commands directory
 
 .PARAMETER WorkspaceRoot
     The root directory of the copilot-resources workspace. Defaults to the script's parent directory.
@@ -17,7 +18,7 @@
 
 .EXAMPLE
     .\Sync-VSCodeUserPrompts.ps1
-    Synchronizes prompts to all VS Code profiles and Cursor IDE using default paths.
+    Synchronizes prompts to all VS Code profiles, Cursor IDE, and Claude Code using default paths.
 
 .EXAMPLE
     .\Sync-VSCodeUserPrompts.ps1 -DryRun
@@ -53,6 +54,7 @@ if ($IsWindows -or $null -eq $IsWindows) {
         "$Env:AppData\Code - Insiders\User\Profiles"
     )
     $CursorCommandsPath = "$Env:USERPROFILE\.cursor\commands"
+    $ClaudeCommandsPath = "$Env:USERPROFILE\.claude\commands"
 }
 elseif ($IsMacOS) {
     # macOS
@@ -61,6 +63,7 @@ elseif ($IsMacOS) {
         "$HOME/Library/Application Support/Code - Insiders/User/Profiles"
     )
     $CursorCommandsPath = "$HOME/.cursor/commands"
+    $ClaudeCommandsPath = "$HOME/.claude/commands"
 }
 elseif ($IsLinux) {
     # Linux
@@ -69,6 +72,7 @@ elseif ($IsLinux) {
         "$HOME/.config/Code - Insiders/User/Profiles"
     )
     $CursorCommandsPath = "$HOME/.cursor/commands"
+    $ClaudeCommandsPath = "$HOME/.claude/commands"
 }
 else {
     Write-ColorOutput "ERROR: Unable to determine operating system" -Color Red
@@ -104,6 +108,18 @@ if ($hasCursor) {
     Write-ColorOutput "`nCursor IDE detected at: $cursorRootPath" -Color Cyan
 }
 
+# Check for Claude Code installation
+$claudeRootPath = if ($IsWindows -or $null -eq $IsWindows) {
+    "$Env:USERPROFILE\.claude"
+} else {
+    "$HOME/.claude"
+}
+
+$hasClaude = Test-Path $claudeRootPath
+if ($hasClaude) {
+    Write-ColorOutput "`nClaude Code detected at: $claudeRootPath" -Color Cyan
+}
+
 # Collect all profile directories from all VS Code installations
 $allProfileDirs = @()
 foreach ($profilesPath in $VSCodeUserProfilesPaths) {
@@ -133,10 +149,10 @@ foreach ($profilesPath in $VSCodeUserProfilesPaths) {
 if ($allProfileDirs.Count -eq 0) {
     Write-ColorOutput "`nERROR: No VS Code profiles found in any installation." -Color Red
     Write-ColorOutput "Make sure VS Code is installed and you have created at least one profile." -Color Yellow
-    if (-not $hasCursor) {
+    if (-not $hasCursor -and -not $hasClaude) {
         exit 1
     }
-    Write-ColorOutput "Continuing with Cursor synchronization..." -Color Yellow
+    Write-ColorOutput "Continuing with Cursor/Claude Code synchronization..." -Color Yellow
 }
 
 if ($DryRun) {
@@ -234,6 +250,52 @@ if ($hasCursor) {
             }
             else {
                 Write-ColorOutput "  [DRY RUN] Would copy $($promptFile.Name) as $cursorFileName" -Color Yellow
+                $totalCopied++
+            }
+        }
+    }
+}
+
+# Synchronize to Claude Code
+if ($hasClaude) {
+    Write-ColorOutput "`nClaude Code Commands:" -Color White
+    
+    # Create commands directory if it doesn't exist
+    if (-not (Test-Path $ClaudeCommandsPath)) {
+        if (-not $DryRun) {
+            try {
+                New-Item -Path $ClaudeCommandsPath -ItemType Directory -Force | Out-Null
+                Write-ColorOutput "  Created commands directory: $ClaudeCommandsPath" -Color Green
+            }
+            catch {
+                Write-ColorOutput "  ERROR: Failed to create Claude Code commands directory: $_" -Color Red
+                $totalErrors++
+            }
+        }
+        else {
+            Write-ColorOutput "  [DRY RUN] Would create commands directory: $ClaudeCommandsPath" -Color Yellow
+        }
+    }
+    
+    if ((Test-Path $ClaudeCommandsPath) -or $DryRun) {
+        foreach ($promptFile in $promptFiles) {
+            # Remove .prompt.md and add .md extension for Claude Code
+            $claudeFileName = $promptFile.Name -replace '\.prompt\.md$', '.md'
+            $targetFile = Join-Path $ClaudeCommandsPath $claudeFileName
+            
+            if (-not $DryRun) {
+                try {
+                    Copy-Item -Path $promptFile.FullName -Destination $targetFile -Force
+                    Write-ColorOutput "  ✓ $claudeFileName" -Color Green
+                    $totalCopied++
+                }
+                catch {
+                    Write-ColorOutput "  ✗ $claudeFileName - ERROR: $_" -Color Red
+                    $totalErrors++
+                }
+            }
+            else {
+                Write-ColorOutput "  [DRY RUN] Would copy $($promptFile.Name) as $claudeFileName" -Color Yellow
                 $totalCopied++
             }
         }
