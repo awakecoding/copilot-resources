@@ -1,5 +1,6 @@
 ---
-description: Generate Git workflow commands to recreate branch changes as unstaged edits
+description: Recreate branch changes as unstaged edits on a fresh branch
+tools: run_in_terminal
 ---
 
 # Git Workflow: Recreate Branch Changes as Unstaged Edits
@@ -12,7 +13,7 @@ The user is working in a repository that uses `master` as the main branch. They 
 
 ## Goal
 
-Create a repeatable, idempotent procedure that:
+**Execute** a repeatable, idempotent procedure that:
 - Creates a new branch from `master`
 - Applies all changes from a source branch as **unstaged** modifications
 - Cleans up whitespace issues during the process
@@ -20,7 +21,7 @@ Create a repeatable, idempotent procedure that:
 
 ## Task
 
-Generate shell commands, scripts, or Git aliases that implement the following workflow:
+**Execute the following Git workflow commands** using the terminal:
 
 Given:
 - Base branch: `master`
@@ -35,17 +36,11 @@ The procedure must:
 4. Apply that diff as **unstaged** changes to tracked files
 5. Fix whitespace errors (trailing spaces, etc.) during application
 
-## Output Format
+## Instructions
 
-Provide one or more of the following:
+**DO NOT just show commands** - actually execute them using the terminal.
 
-1. **Direct shell commands** - Complete sequence ready to copy/paste
-2. **Shell function** - Named function like `git-redo-branch <SOURCE> <TARGET>`
-3. **Standalone script** - Full script file (e.g., `redo-branch.sh`) with parameters
-
-## Canonical Workflow
-
-Base all solutions on this reference implementation:
+Follow this workflow by running each command:
 
 ```bash
 # 1. Create fresh branch from master
@@ -70,6 +65,7 @@ git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix
 ## Constraints
 
 **MUST:**
+- **Actually execute the commands** in the terminal, do not just display them
 - Use standard Git commands: `git switch`, `git diff`, `git apply`, `git reset`, `git clean`
 - Use diff-and-apply approach (NOT `git merge` or `git cherry-pick`)
 - Apply changes with: `git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix`
@@ -79,53 +75,22 @@ git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix
 - Parameterize source and target branch names
 
 **MUST NOT:**
+- Just show or generate commands without executing them
 - Perform destructive operations on `<SOURCE_BRANCH>` or `master`
 - Use merge or cherry-pick commands
 - Leave any staged changes
 
-**WARNINGS TO INCLUDE:**
-- Clearly document that `git reset --hard` and `git clean -fd` will discard:
-  - All local uncommitted changes on `<TARGET_BRANCH>`
-  - All untracked files in the working tree
-- User must ensure they have no work to preserve before running
+**WARNINGS:**
+Before executing, confirm with user that:
+- `git reset --hard` and `git clean -fd` will discard all local uncommitted changes on `<TARGET_BRANCH>`
+- All untracked files in the working tree will be removed
+- They have no work to preserve before proceeding
 
-## Examples
-
-### Shell Function Example:
-```bash
-git-redo-branch() {
-  local source_branch="$1"
-  local target_branch="$2"
-  
-  git switch master
-  git switch -c "$target_branch"
-  git reset --hard
-  git clean -fd
-  git diff "master...$source_branch" | git apply --whitespace=fix
-}
-```
-
-### PowerShell Function Example:
-```powershell
-function Git-RedoBranch {
-  param(
-    [Parameter(Mandatory=$true)]
-    [string]$SourceBranch,
-    [Parameter(Mandatory=$true)]
-    [string]$TargetBranch
-  )
-  
-  git switch master
-  git switch -c $TargetBranch
-  git reset --hard
-  git clean -fd
-  git diff "master...$SourceBranch" | git apply --whitespace=fix
-}
-```
+Once confirmed, execute the commands immediately.
 
 ## Success Criteria
 
-After running the generated commands:
+After executing the commands:
 - ✓ User is on `<TARGET_BRANCH>`
 - ✓ `HEAD` matches `master` commit
 - ✓ All changes from `<SOURCE_BRANCH>` are present as unstaged edits
