@@ -41,44 +41,39 @@ The procedure must:
 
 **DO NOT just show commands** - actually execute them using the terminal.
 
-### Step 1: Safety Checks
+### Step 1: Safety Checks and Branch Setup
 
-First, check the current branch and destination branch:
+First, check the current branch:
 
 **If current branch is `master` or `main`:**
-- Proceed to create the target branch from master
+- Create and switch to the target branch:
+  ```bash
+  git switch -c <TARGET_BRANCH>
+  ```
 
 **If current branch is NOT `master` or `main`:**
-- Check if the current branch has commits ahead of its base branch
-- Run: `git rev-list --count HEAD ^$(git merge-base HEAD master)`
-- **If count is 0** (no commits ahead): The branch is clean, proceed
-- **If count > 0** (has commits): The branch may be unclean, ask user:
+- Assume we're already on the target branch
+- Check if the branch has commits ahead of its base: `git rev-list --count HEAD ^$(git merge-base HEAD master)`
+- **If count is 0** (no commits ahead): The branch is clean at the branch point, proceed to Step 2
+- **If count > 0** (has commits): Ask user:
   ```
   ⚠️ Current branch has {count} commit(s) ahead of master.
-  This may overwrite uncommitted work. Continue? (yes/no)
+  Reset to master and clean working tree before applying diff? (yes/no)
   ```
-  - Only proceed if user confirms "yes"
+  - If "yes": Execute `git reset --hard master` and `git clean -fd`, then proceed to Step 2
+  - If "no": Cancel operation
 
-### Step 2: Execute Workflow
+### Step 2: Apply Diff
 
-Follow this workflow by running each command:
+Apply the diff from the source branch:
 
 ```bash
-# 1. Create fresh branch from master
-git switch master
-git switch -c <TARGET_BRANCH>
-
-# 2. Clean working tree (tracked + untracked files)
-git reset --hard
-git clean -fd
-
-# 3. Apply changes from SOURCE_BRANCH, fixing whitespace
 git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix
 ```
 
 **Result State:**
 - Current branch: `<TARGET_BRANCH>`
-- HEAD points to same commit as `master`
+- HEAD points to same commit as `master` (if branch was clean or reset)
 - All changes from `<SOURCE_BRANCH>` present as unstaged modifications
 - No new commits created
 - Whitespace issues cleaned up
@@ -88,31 +83,34 @@ git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix
 **MUST:**
 - **Actually execute the commands** in the terminal, do not just display them
 - **Perform safety checks** on current and target branch before proceeding
-- Check if current branch is master/main before creating target branch
-- Check if current branch has commits ahead of base (if not master/main)
-- Ask for confirmation if current branch has uncommitted work
+- Check if current branch is master/main - if yes, create and switch to target branch
+- If already on target branch, check if it has commits ahead of base
+- Only ask about reset/clean if branch has commits ahead
+- **Do NOT switch branches** if already on the target branch
+- **Do NOT reset/clean** if the branch is already clean (0 commits ahead of master)
 - Use standard Git commands: `git switch`, `git diff`, `git apply`, `git reset`, `git clean`
 - Use diff-and-apply approach (NOT `git merge` or `git cherry-pick`)
 - Apply changes with: `git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix`
-- Clean working tree with: `git reset --hard` + `git clean -fd`
+- If reset is needed, use: `git reset --hard master` + `git clean -fd`
 - Prefer `git switch` over `git checkout`
-- Make solution idempotent (safe to re-run)
 - Parameterize source and target branch names
 
 **MUST NOT:**
 - Just show or generate commands without executing them
 - Proceed without safety checks on the current/target branch
+- Switch branches unnecessarily when already on target branch
+- Reset or clean unnecessarily when branch is already at the right commit
 - Perform destructive operations on `<SOURCE_BRANCH>` or `master`
 - Use merge or cherry-pick commands
 - Leave any staged changes
 
 **WARNINGS:**
-Before executing, confirm with user that:
-- `git reset --hard` and `git clean -fd` will discard all local uncommitted changes on `<TARGET_BRANCH>`
-- All untracked files in the working tree will be removed
-- They have no work to preserve before proceeding
+Only if branch has commits and user confirms reset:
+- `git reset --hard master` will reset branch to master commit
+- `git clean -fd` will remove all untracked files in the working tree
+- User must confirm before these destructive operations
 
-Once confirmed, execute the commands immediately.
+Then execute the diff application.
 
 ## Success Criteria
 
