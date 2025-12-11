@@ -30,15 +30,36 @@ Given:
 
 The procedure must:
 
-1. Create a new branch `<TARGET_BRANCH>` from `master`
-2. Ensure the working tree is completely clean (no staged, modified, or untracked files)
-3. Compute the diff between `master` and `<SOURCE_BRANCH>`
-4. Apply that diff as **unstaged** changes to tracked files
-5. Fix whitespace errors (trailing spaces, etc.) during application
+1. Check the current branch and target branch safety
+2. Create a new branch `<TARGET_BRANCH>` from `master` (if needed)
+3. Ensure the working tree is completely clean (no staged, modified, or untracked files)
+4. Compute the diff between `master` and `<SOURCE_BRANCH>`
+5. Apply that diff as **unstaged** changes to tracked files
+6. Fix whitespace errors (trailing spaces, etc.) during application
 
 ## Instructions
 
 **DO NOT just show commands** - actually execute them using the terminal.
+
+### Step 1: Safety Checks
+
+First, check the current branch and destination branch:
+
+**If current branch is `master` or `main`:**
+- Proceed to create the target branch from master
+
+**If current branch is NOT `master` or `main`:**
+- Check if the current branch has commits ahead of its base branch
+- Run: `git rev-list --count HEAD ^$(git merge-base HEAD master)`
+- **If count is 0** (no commits ahead): The branch is clean, proceed
+- **If count > 0** (has commits): The branch may be unclean, ask user:
+  ```
+  ⚠️ Current branch has {count} commit(s) ahead of master.
+  This may overwrite uncommitted work. Continue? (yes/no)
+  ```
+  - Only proceed if user confirms "yes"
+
+### Step 2: Execute Workflow
 
 Follow this workflow by running each command:
 
@@ -66,6 +87,10 @@ git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix
 
 **MUST:**
 - **Actually execute the commands** in the terminal, do not just display them
+- **Perform safety checks** on current and target branch before proceeding
+- Check if current branch is master/main before creating target branch
+- Check if current branch has commits ahead of base (if not master/main)
+- Ask for confirmation if current branch has uncommitted work
 - Use standard Git commands: `git switch`, `git diff`, `git apply`, `git reset`, `git clean`
 - Use diff-and-apply approach (NOT `git merge` or `git cherry-pick`)
 - Apply changes with: `git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix`
@@ -76,6 +101,7 @@ git diff master...<SOURCE_BRANCH> | git apply --whitespace=fix
 
 **MUST NOT:**
 - Just show or generate commands without executing them
+- Proceed without safety checks on the current/target branch
 - Perform destructive operations on `<SOURCE_BRANCH>` or `master`
 - Use merge or cherry-pick commands
 - Leave any staged changes
