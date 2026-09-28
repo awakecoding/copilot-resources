@@ -1,10 +1,30 @@
 # Copilot Resources
 
-Curated GitHub Copilot [prompt files](https://code.visualstudio.com/docs/copilot/customization/prompt-files) and [custom instructions](https://code.visualstudio.com/docs/copilot/customization/custom-instructions) for professional development.
+Curated [Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills), legacy GitHub Copilot [prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), and [custom instructions](https://code.visualstudio.com/docs/agent-customization/custom-instructions) for development workflows.
+
+## Agent Skills (`SKILL.md`)
+
+| Skill | Description |
+|-------|-------------|
+| [Prompt Crafter](.claude/skills/prompt-crafter/SKILL.md) | Design reusable prompts, skills, instructions, and agents for the intended host |
+| [Rubber Duck](.claude/skills/rubber-duck/SKILL.md) | Ask Copilot CLI's built-in rubber-duck subagent for a verified, read-only critique from Claude Code |
+
+Skills in `.claude/skills/` are discovered by Claude Code, VS Code Copilot, and Cursor when working in this repository. The rubber-duck skill is **Claude Code-specific**: its [agent](.claude/agents/copilot-rubber-duck.md) invokes a [PowerShell 7 bridge](.claude/skills/rubber-duck/bridge.ps1) at a *personal* `~/.claude/skills/rubber-duck/bridge.ps1` path. To use `/rubber-duck` in other repositories, install the two skill files and the agent under your personal Claude directory (review existing files before replacing them):
+
+```powershell
+$skillDir = Join-Path $HOME '.claude/skills/rubber-duck'
+$agentDir = Join-Path $HOME '.claude/agents'
+New-Item -ItemType Directory -Force $skillDir, $agentDir | Out-Null
+Copy-Item .claude/skills/rubber-duck/SKILL.md $skillDir
+Copy-Item .claude/skills/rubber-duck/bridge.ps1 $skillDir
+Copy-Item .claude/agents/copilot-rubber-duck.md $agentDir
+```
+
+Run these commands from this repository's root. The bridge requires `pwsh` and an authenticated `copilot` CLI; invoke `/rubber-duck <review request>` in Claude Code. It passes the request verbatim to Copilot CLI without selecting a model, verifies the actual rubber-duck agent in JSON events, and restricts tool access. Diagnostic logs in `~/.claude/logs/rubber-duck/` can contain the request, code, and critique: keep them private and out of version control. Copying the skill into this repository alone does **not** make the agent's personal helper path available on a new machine.
 
 ## Prompts (`.prompt.md`)
 
-Reusable prompts for common development tasks. Run with `/prompt-name` in chat.
+Reusable prompts for common development tasks. Run with `/prompt-name` in VS Code's Local agent; [Agent Host does not load prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), so use skills for new cross-agent workflows. This collection remains available for existing users. It is stored in `prompts/` as a source library rather than an automatically discovered workspace `.github/prompts/` directory.
 
 | Prompt | Description |
 |--------|-------------|
@@ -35,7 +55,7 @@ Utility scripts for managing Copilot resources.
 ### Usage
 
 ```powershell
-# Synchronize prompts to all profiles
+# Synchronize legacy prompts to installed VS Code profiles, Cursor, and Claude Code
 .\scripts\Sync-VSCodeUserPrompts.ps1
 
 # Preview changes without copying files
@@ -43,8 +63,8 @@ Utility scripts for managing Copilot resources.
 ```
 
 The script automatically detects and synchronizes prompts to:
-- **VS Code** (Stable and Insiders) - Copies `.prompt.md` files to user profile prompts directories
+- **VS Code** (Stable and Insiders) - Copies `.prompt.md` files to the default and named user profiles' `prompts` directories
 - **Cursor IDE** - Copies as `.md` files to `~/.cursor/commands` (if `~/.cursor` exists)
 - **Claude Code** - Copies as `.md` files to `~/.claude/commands` (if `~/.claude` exists)
 
-Works across Windows, macOS, and Linux.
+This is a **legacy prompt sync**, not a skill installer: VS Code-specific prompt metadata and input variables might not work in other hosts. It overwrites same-named command/prompt files at the destinations, does not delete stale copies, and does not install the rubber-duck skill or agent. Use `-DryRun` to inspect destinations first. Works across Windows, macOS, and Linux with PowerShell 7 (and Windows PowerShell 5.1 on Windows).

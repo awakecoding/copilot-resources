@@ -38,8 +38,7 @@ When you generate a migration plan, you'll create this structure:
 ```markdown
 ---
 description: Creates a comprehensive migration plan with setup/execution/cleanup phases
-tools: [create_file, list_dir, run_in_terminal]
-agent: edit
+agent: agent
 argument-hint: "Migration name, item count, batch size, transformation pattern"
 ---
 
@@ -395,8 +394,7 @@ After generating all files:
 ```markdown
 ---
 description: Entry point for executing migration - run repeatedly until complete
-tools: [read_file, replace_string_in_file, create_file, run_in_terminal, list_dir]
-agent: edit
+agent: agent
 argument-hint: "Optional: 'setup', 'execution', or 'cleanup' to override phase detection"
 ---
 

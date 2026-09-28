@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Copies all .prompt.md files from the workspace prompts directory to the prompts
-    folder of all VS Code user profiles and to Cursor IDE and Claude Code commands directories.
+    folder of the default and named VS Code user profiles and to Cursor IDE and Claude Code commands directories.
     
     VS Code: Files are copied as .prompt.md to profile prompts directories
     Cursor IDE: Files are copied as .md to ~/.cursor/commands directory
@@ -120,11 +120,20 @@ if ($hasClaude) {
     Write-ColorOutput "`nClaude Code detected at: $claudeRootPath" -Color Cyan
 }
 
-# Collect all profile directories from all VS Code installations
+# Collect default and named profiles from all VS Code installations
 $allProfileDirs = @()
 foreach ($profilesPath in $VSCodeUserProfilesPaths) {
+    $edition = if ($profilesPath -like "*Insiders*") { "Insiders" } else { "Stable" }
+    $defaultProfile = Split-Path -Parent $profilesPath
+    if (Test-Path $defaultProfile -PathType Container) {
+        $allProfileDirs += [PSCustomObject]@{
+            Directory = Get-Item $defaultProfile
+            Edition = "$edition Default"
+        }
+        Write-ColorOutput "`nFound default profile in VS Code $edition ($defaultProfile)" -Color Cyan
+    }
+
     if (Test-Path $profilesPath) {
-        $edition = if ($profilesPath -like "*Insiders*") { "Insiders" } else { "Stable" }
         $profiles = Get-ChildItem -Path $profilesPath -Directory
         if ($profiles.Count -gt 0) {
             Write-ColorOutput "`nFound $($profiles.Count) profile(s) in VS Code $edition ($profilesPath):" -Color Cyan
@@ -141,14 +150,12 @@ foreach ($profilesPath in $VSCodeUserProfilesPaths) {
         }
     }
     else {
-        $edition = if ($profilesPath -like "*Insiders*") { "Insiders" } else { "Stable" }
         Write-ColorOutput "`nVS Code $edition profiles directory not found: $profilesPath" -Color Gray
     }
 }
 
 if ($allProfileDirs.Count -eq 0) {
-    Write-ColorOutput "`nERROR: No VS Code profiles found in any installation." -Color Red
-    Write-ColorOutput "Make sure VS Code is installed and you have created at least one profile." -Color Yellow
+    Write-ColorOutput "`nNo VS Code user profiles found in any installation." -Color Yellow
     if (-not $hasCursor -and -not $hasClaude) {
         exit 1
     }
@@ -194,7 +201,7 @@ foreach ($profileInfo in $allProfileDirs) {
         
         if (-not $DryRun) {
             try {
-                Copy-Item -Path $promptFile.FullName -Destination $targetFile -Force
+                Copy-Item -Path $promptFile.FullName -Destination $targetFile -Force -ErrorAction Stop
                 Write-ColorOutput "  ✓ $($promptFile.Name)" -Color Green
                 $totalCopied++
             }
@@ -239,7 +246,7 @@ if ($hasCursor) {
             
             if (-not $DryRun) {
                 try {
-                    Copy-Item -Path $promptFile.FullName -Destination $targetFile -Force
+                    Copy-Item -Path $promptFile.FullName -Destination $targetFile -Force -ErrorAction Stop
                     Write-ColorOutput "  ✓ $cursorFileName" -Color Green
                     $totalCopied++
                 }
@@ -285,7 +292,7 @@ if ($hasClaude) {
             
             if (-not $DryRun) {
                 try {
-                    Copy-Item -Path $promptFile.FullName -Destination $targetFile -Force
+                    Copy-Item -Path $promptFile.FullName -Destination $targetFile -Force -ErrorAction Stop
                     Write-ColorOutput "  ✓ $claudeFileName" -Color Green
                     $totalCopied++
                 }

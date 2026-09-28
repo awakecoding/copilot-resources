@@ -38,8 +38,7 @@ When you generate a project plan, you'll create this structure:
 ```markdown
 ---
 description: Creates a comprehensive project plan with multiple phases and structured task tracking
-tools: [create_file, list_dir, run_in_terminal, semantic_search, grep_search]
-agent: edit
+agent: agent
 argument-hint: "Project name, goal description, task breakdown, phase structure"
 ---
 
@@ -508,7 +507,7 @@ After generating all files:
 ```markdown
 ---
 description: Entry point for project execution - run repeatedly until complete
-agent: edit
+agent: agent
 argument-hint: "Optional: specific task ID to work on, or leave empty for automatic selection"
 ---
 

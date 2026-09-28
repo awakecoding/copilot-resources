@@ -4,7 +4,7 @@ description: Interactive prompt engineering assistant that helps craft well-stru
 
 # Prompt Crafter
 
-I will help you create a well-structured `.prompt.md` file following VS Code GitHub Copilot best practices. Let's build your prompt using the 7 key elements of effective prompting.
+I will help you create a well-structured `.prompt.md` file for VS Code's Local agent. For new cross-agent workflows, prefer an Agent Skill; VS Code Agent Host does not load prompt files. Let's build your prompt using the 7 key elements of effective prompting.
 
 ## Discovery Questions
 
@@ -61,7 +61,6 @@ Here's what your generated prompt file will look like:
 ```markdown
 ---
 description: [Generated from your REQUEST]
-tools: [Relevant tools based on your task]
 ---
 
 # [Prompt Title]
@@ -103,8 +102,9 @@ You are a [PERSONA]. [CONTEXT about the environment/project].
 
 **Prompt files** (`.prompt.md`) are Markdown files that define reusable prompts for development tasks. They can be run directly in Copilot Chat and support standardized workflows.
 
-- **Workspace prompt files**: Available only in the current workspace, typically stored in `.github/prompts` or a workspace-specific folder.
+- **Workspace prompt files**: Available only in the current workspace, typically stored in `.github/prompts` or a configured workspace-specific folder.
 - **User prompt files**: Available across all workspaces, stored in your VS Code profile.
+- **Agent Host**: Does not load prompt files. Migrate reusable workflows to Agent Skills; the Local agent still supports prompt files for now.
 
 ### Structure
 
@@ -116,7 +116,7 @@ At the top, use YAML frontmatter to configure metadata:
 | description     | Short summary of the prompt's purpose.                                      |
 | name            | Command name (used after `/` in chat). If omitted, filename is used.        |
 | argument-hint   | Optional hint for chat input field.                                         |
-| agent           | Agent to run the prompt (`ask`, `edit`, `agent`, or custom agent name).     |
+| agent           | Agent to run the prompt (`ask`, `plan`, `agent`, or custom agent name).     |
 | model           | Language model to use (optional).                                           |
 | tools           | List of tool or tool set names available for this prompt.                   |
 
