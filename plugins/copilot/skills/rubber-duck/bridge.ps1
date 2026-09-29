@@ -1,11 +1,12 @@
 param(
     [switch]$Heredoc,
-    [ValidateRange(1, 480)][int]$TimeoutSeconds = 480
+    [ValidateRange(1, 1200)][int]$TimeoutSeconds = 1200
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $logDirectory = $null
+$metadata = $null
 
 function Resolve-Copilot {
     $command = Get-Command copilot -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -47,13 +48,33 @@ try {
     }
     [Console]::Error.WriteLine("Rubber-duck log: $logDirectory")
 
+    $metadata = [ordered]@{
+        timestampUtc = [DateTimeOffset]::UtcNow.ToString('o')
+        workingDirectory = (Get-Location).ProviderPath
+        copilotExecutable = $copilot
+        parentModel = $null
+        criticModel = $null
+        modelSelectionSource = $null
+        copilotExitCode = $null
+        sessionExitCode = $null
+        timeoutSeconds = $TimeoutSeconds
+        timedOut = $false
+        truncatedEvent = $false
+        rubberDuckAgentId = $null
+        rubberDuckStarted = $false
+        rubberDuckCompleted = $false
+        agentsStarted = @()
+        outcome = 'failed'
+        eventCounts = @{}
+    }
     $prompt = '/rubber-duck ' + $request
     $arguments = @(
         '--prompt', $prompt,
         '--output-format=json', '--stream=off',
         '--no-ask-user', '--no-auto-update', '--disable-builtin-mcps',
-        '--allow-tool=read', '--allow-tool=shell(git status),shell(git diff)',
-        '--deny-tool=write', '--deny-tool=url', '--deny-tool=memory'
+        '--allow-tool=read',
+        '--allow-tool=shell(git status),shell(git diff),shell(git log),shell(git show),shell(git rev-parse),shell(git merge-base),shell(git ls-files)',
+        '--deny-tool=write', '--deny-tool=url', '--deny-tool=memory', '--deny-tool=shell(git push)'
     )
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $copilot
@@ -80,8 +101,8 @@ try {
         $null = $process.Start()
         $stdout = $process.StandardOutput.BaseStream.CopyToAsync($eventFile)
         $stderr = $process.StandardError.BaseStream.CopyToAsync($errorFile)
-        $timedOut = -not $process.WaitForExit($TimeoutSeconds * 1000)
-        if ($timedOut) {
+        $metadata.timedOut = -not $process.WaitForExit($TimeoutSeconds * 1000)
+        if ($metadata.timedOut) {
             $process.Kill($true)
             $process.WaitForExit()
         }
@@ -89,7 +110,7 @@ try {
         $null = $stderr.GetAwaiter().GetResult()
         $eventFile.Flush()
         $errorFile.Flush()
-        $exitCode = $process.ExitCode
+        $metadata.copilotExitCode = $process.ExitCode
     }
     finally {
         if ($eventFile) { $eventFile.Dispose() }
@@ -97,106 +118,102 @@ try {
         $process.Dispose()
     }
 
-    if ($timedOut) { throw "Copilot CLI timed out after $TimeoutSeconds seconds; partial events and stderr are in the log." }
     $output = [IO.File]::ReadAllText($eventsPath, [Text.Encoding]::UTF8)
 
-    $started = $false
-    $completed = $false
-    $rubberDuckAgentId = $null
     $critiqueMessages = [Collections.Generic.List[string]]::new()
     $lastParentMessage = $null
-    $parentModel = $null
-    $criticModel = $null
-    $modelSelection = $null
-    $sessionExitCode = $null
-    $agentsStarted = @()
-    $eventCounts = @{}
-    foreach ($line in ($output -split "`r?`n")) {
+    $lines = $output -split "`r?`n"
+    for ($lineIndex = 0; $lineIndex -lt $lines.Length; $lineIndex++) {
+        $line = $lines[$lineIndex]
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        $event = ConvertFrom-Json -InputObject $line -AsHashtable
+        try {
+            $event = ConvertFrom-Json -InputObject $line -AsHashtable
+        }
+        catch {
+            # Killing the process can interrupt its final JSON record.
+            if ($metadata.timedOut -and $lineIndex -eq $lines.Length - 1 -and -not $output.EndsWith("`n")) {
+                $metadata.truncatedEvent = $true
+                break
+            }
+            throw
+        }
         $type = $event['type']
-        $eventCounts[$type] = 1 + [int]$eventCounts[$type]
+        $metadata.eventCounts[$type] = 1 + [int]$metadata.eventCounts[$type]
+        $agentId = $event['agentId']
         $data = $event['data']
-        if ($type -eq 'model.call_start' -and -not $parentModel) {
-            $parentModel = $data.model
+        if ($data -isnot [Collections.IDictionary]) { $data = @{} }
+        if ($type -eq 'model.call_start' -and -not $agentId -and -not $metadata.parentModel) {
+            $metadata.parentModel = $data['model']
         }
         elseif ($type -eq 'subagent.started') {
-            $agentsStarted += [ordered]@{ name = $data.agentName; model = $data.model }
-            if ($data.agentName -eq 'rubber-duck') {
+            $metadata.agentsStarted += [ordered]@{ name = $data['agentName']; model = $data['model'] }
+            if ($data['agentName'] -eq 'rubber-duck') {
                 # A later rubber-duck invocation supersedes earlier ones.
-                $started = $true
-                $completed = $false
-                $rubberDuckAgentId = $event['agentId']
+                $metadata.rubberDuckStarted = $true
+                $metadata.rubberDuckCompleted = $false
+                $metadata.rubberDuckAgentId = $agentId
                 $critiqueMessages.Clear()
-                $criticModel = $data.model
-                $modelSelection = $data.modelSelectionSource
+                $metadata.criticModel = $data['model']
+                $metadata.modelSelectionSource = $data['modelSelectionSource']
             }
         }
         elseif ($type -eq 'assistant.message') {
-            $content = $data.content
+            $content = $data['content']
             if ($content -isnot [string] -or -not $content.Trim()) { continue }
-            $agentId = $event['agentId']
             if ($agentId) {
                 # Messages that also request tools are progress narration, not the critique.
-                $hasToolRequests = $data.toolRequests -and @($data.toolRequests).Count -gt 0
-                if ($rubberDuckAgentId -and $agentId -eq $rubberDuckAgentId -and -not $completed -and -not $hasToolRequests) {
+                $toolRequests = $data['toolRequests']
+                $hasToolRequests = $toolRequests -and @($toolRequests).Count -gt 0
+                if ($metadata.rubberDuckAgentId -and $agentId -eq $metadata.rubberDuckAgentId -and -not $metadata.rubberDuckCompleted -and -not $hasToolRequests) {
                     $critiqueMessages.Add($content)
                 }
             }
-            elseif (-not $started) {
+            elseif (-not $metadata.rubberDuckStarted) {
                 $lastParentMessage = $content
             }
         }
-        elseif ($type -eq 'subagent.completed' -and $rubberDuckAgentId -and $event['agentId'] -eq $rubberDuckAgentId) {
-            $completed = $true
+        elseif ($type -eq 'subagent.completed' -and $metadata.rubberDuckAgentId -and $agentId -eq $metadata.rubberDuckAgentId) {
+            $metadata.rubberDuckCompleted = $true
         }
-        elseif ($type -eq 'result') { $sessionExitCode = $event['exitCode'] }
+        elseif ($type -eq 'result') { $metadata.sessionExitCode = $event['exitCode'] }
     }
 
-    $metadata = [ordered]@{
-        timestampUtc = [DateTimeOffset]::UtcNow.ToString('o')
-        workingDirectory = $info.WorkingDirectory
-        copilotExecutable = $copilot
-        parentModel = $parentModel
-        criticModel = $criticModel
-        modelSelectionSource = $modelSelection
-        copilotExitCode = $exitCode
-        sessionExitCode = $sessionExitCode
-        rubberDuckStarted = $started
-        rubberDuckCompleted = $completed
-        agentsStarted = $agentsStarted
-        outcome = if ($exitCode -eq 0 -and $sessionExitCode -eq 0 -and $completed -and $critiqueMessages.Count -gt 0) { 'success' } else { 'failed' }
-        eventCounts = $eventCounts
+    if ($metadata.timedOut) { throw "Copilot CLI timed out after $TimeoutSeconds seconds; partial events and stderr are in the log." }
+    if ($metadata.copilotExitCode -ne 0) {
+        throw "Copilot CLI exited with code $($metadata.copilotExitCode). See stderr.txt and events.jsonl."
     }
-    [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
-
-    if ($exitCode -ne 0) {
-        throw "Copilot CLI exited with code $exitCode. See stderr.txt and events.jsonl."
+    if ($metadata.sessionExitCode -ne 0) {
+        throw "Copilot session ended with exit code $($metadata.sessionExitCode). See events.jsonl."
     }
-    if ($sessionExitCode -ne 0) {
-        throw "Copilot session ended with exit code $sessionExitCode. See events.jsonl."
-    }
-    if (-not $completed) {
+    if (-not $metadata.rubberDuckCompleted) {
         if ($lastParentMessage) {
             [IO.File]::WriteAllText((Join-Path $logDirectory 'parent-response.txt'), $lastParentMessage, [Text.UTF8Encoding]::new($false))
         }
         $reason = if ($lastParentMessage) { $lastParentMessage.Trim() } else { 'No parent response was recorded.' }
         if ($reason.Length -gt 500) { $reason = $reason.Substring(0, 500) + '...' }
-        $status = if ($started) { 'started but did not complete' } else { 'was not invoked' }
+        $status = if ($metadata.rubberDuckStarted) { 'started but did not complete' } else { 'was not invoked' }
         throw "The built-in rubber-duck subagent $status. Copilot said: $reason"
     }
     if ($critiqueMessages.Count -eq 0) { throw 'The built-in rubber-duck subagent completed without a critique.' }
     $critique = $critiqueMessages -join "`n`n"
-    $verifiedModel = if ($criticModel) { $criticModel } else { 'not reported' }
-    $selection = if ($modelSelection) { $modelSelection } else { 'not reported' }
+    $verifiedModel = if ($metadata.criticModel) { $metadata.criticModel } else { 'not reported' }
+    $selection = if ($metadata.modelSelectionSource) { $metadata.modelSelectionSource } else { 'not reported' }
     $report = "**Verified rubber-duck critic model:** ``$verifiedModel`` (Copilot selection: ``$selection``).`n`n$critique"
     [IO.File]::WriteAllText((Join-Path $logDirectory 'critique.md'), $report, [Text.UTF8Encoding]::new($false))
+    $metadata.outcome = 'success'
+    $metadata.timestampUtc = [DateTimeOffset]::UtcNow.ToString('o')
+    [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
     [Console]::Out.WriteLine($report)
 }
 catch {
     [Console]::Error.WriteLine("Rubber-duck bridge failed: $($_.Exception.Message)")
     if ($logDirectory) {
         try {
+            if ($metadata) {
+                $metadata.outcome = 'failed'
+                $metadata.timestampUtc = [DateTimeOffset]::UtcNow.ToString('o')
+                [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+            }
             [IO.File]::WriteAllText(
                 (Join-Path $logDirectory 'failure.txt'),
                 "$([DateTimeOffset]::UtcNow.ToString('o')) $($_.Exception.Message)",
