@@ -38,12 +38,32 @@ try {
         else { throw 'The request heredoc must end with a newline.' }
     }
 
-    # Only a leading --model option is recognized; the rest of the request is passed through unchanged.
     $model = $null
+    $modelSelectionSource = 'default'
     $match = [regex]::Match($request, '\A--model(?:=|[ \t]+)([A-Za-z0-9._:-]+)(?:[ \t]*\r?\n|[ \t]+)')
     if ($match.Success) {
         $model = $match.Groups[1].Value
         $request = $request.Substring($match.Length)
+        $modelSelectionSource = 'explicit option'
+    }
+    elseif ($Mode -eq 'read') {
+        $modelNames = @(
+            'GPT[ -]?[0-9]+(?:\.[0-9]+)*(?:[ -](?:mini|codex|astra|sol|terra|luna))?'
+            'Claude[ -](?:Opus|Sonnet|Haiku|Fable)[ -][0-9]+(?:\.[0-9]+)*(?:[ -]fast)?'
+            'Gemini[ -][0-9]+(?:\.[0-9]+)*(?:[ -](?:Flash|Pro))?'
+            'Grok[ -][0-9]+(?:\.[0-9]+)*'
+            'Kimi[ -]K[0-9]+(?:\.[0-9]+)*(?:[ -]Code)?'
+            'MAI[ -]Code[ -][0-9]+(?:\.[0-9]+)*(?:[ -]Flash)?'
+        )
+        $modelName = '(?<model>(?:' + ($modelNames -join '|') + '))'
+        $match = [regex]::Match($request, "\A(?:use|using|with)\s+$modelName(?=\s+(?:to\b|for\b)|[\s,:])", [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if (-not $match.Success) {
+            $match = [regex]::Match($request, "(?:\s|^)(?:using|with)\s+$modelName[.!]?\s*\z", [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        }
+        if ($match.Success) {
+            $model = [regex]::Replace($match.Groups['model'].Value.ToLowerInvariant(), '[ -]+', '-')
+            $modelSelectionSource = 'prompt'
+        }
     }
     if ([string]::IsNullOrWhiteSpace($request)) { throw 'Provide a prompt after the command.' }
 
@@ -157,6 +177,7 @@ try {
         workingDirectory = $info.WorkingDirectory
         copilotExecutable = $copilot
         requestedModel = $model
+        modelSelectionSource = $modelSelectionSource
         parentModel = $parentModel
         copilotExitCode = $exitCode
         sessionExitCode = $sessionExitCode
