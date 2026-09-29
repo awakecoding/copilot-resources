@@ -1,5 +1,4 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('rubber-duck', 'read', 'write')][string]$Mode,
     [switch]$Heredoc,
     [ValidateRange(1, 480)][int]$TimeoutSeconds = 480
 )
@@ -37,50 +36,25 @@ try {
         elseif ($request.EndsWith("`n")) { $request = $request.Substring(0, $request.Length - 1) }
         else { throw 'The request heredoc must end with a newline.' }
     }
-    $model = $null
-    if ($Mode -ne 'rubber-duck') {
-        # Only a leading --model option is recognized; the rest of the request is passed through unchanged.
-        $match = [regex]::Match($request, '\A--model(?:=|[ \t]+)([A-Za-z0-9._:-]+)(?:[ \t]*\r?\n|[ \t]+)')
-        if ($match.Success) {
-            $model = $match.Groups[1].Value
-            $request = $request.Substring($match.Length)
-        }
-    }
-    if ([string]::IsNullOrWhiteSpace($request)) { throw 'Provide a request after the command.' }
-
-    $readOnlyTools = @(
-        '--allow-tool=read', '--allow-tool=shell(git status),shell(git diff)',
-        '--deny-tool=write', '--deny-tool=url', '--deny-tool=memory'
-    )
-    $modeConfig = @{
-        'rubber-duck' = @{ Prefix = '/rubber-duck '; RequiredAgent = 'rubber-duck'; LogName = 'rubber-duck'; Tools = $readOnlyTools }
-        'read' = @{ Prefix = ''; RequiredAgent = $null; LogName = 'copilot-cli'; Tools = $readOnlyTools }
-        'write' = @{
-            Prefix = ''; RequiredAgent = $null; LogName = 'copilot-cli'
-            Tools = @(
-                '--allow-tool=read', '--allow-tool=write', '--allow-tool=shell',
-                '--deny-tool=shell(git push)', '--deny-tool=url', '--deny-tool=memory'
-            )
-        }
-    }[$Mode]
-    $requiredAgent = $modeConfig.RequiredAgent
+    if ([string]::IsNullOrWhiteSpace($request)) { throw 'Provide a review request after /rubber-duck.' }
 
     $copilot = Resolve-Copilot
-    $logRoot = Join-Path $HOME ".claude/logs/$($modeConfig.LogName)"
+    $logRoot = Join-Path $HOME '.claude/logs/rubber-duck'
     $logDirectory = Join-Path $logRoot ("{0}-{1}" -f [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'), [guid]::NewGuid().ToString('N').Substring(0, 8))
     $null = New-Item -ItemType Directory -Path $logDirectory -Force
     if (-not $IsWindows) {
         [IO.Directory]::SetUnixFileMode($logDirectory, [IO.UnixFileMode]'UserRead,UserWrite,UserExecute')
     }
-    [Console]::Error.WriteLine("Copilot bridge ($Mode) log: $logDirectory")
+    [Console]::Error.WriteLine("Rubber-duck log: $logDirectory")
 
-    $prompt = $modeConfig.Prefix + $request
+    $prompt = '/rubber-duck ' + $request
     $arguments = @(
         '--prompt', $prompt,
         '--output-format=json', '--stream=off',
-        '--no-ask-user', '--no-auto-update', '--disable-builtin-mcps'
-    ) + $modeConfig.Tools
-    if ($model) { $arguments += @('--model', $model) }
+        '--no-ask-user', '--no-auto-update', '--disable-builtin-mcps',
+        '--allow-tool=read', '--allow-tool=shell(git status),shell(git diff)',
+        '--deny-tool=write', '--deny-tool=url', '--deny-tool=memory'
+    )
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $copilot
     $info.WorkingDirectory = (Get-Location).ProviderPath
@@ -128,9 +102,8 @@ try {
 
     $started = $false
     $completed = $false
-    $targetAgentId = $null
-    $resultMessages = [Collections.Generic.List[string]]::new()
-    $parentFinalMessages = [Collections.Generic.List[string]]::new()
+    $rubberDuckAgentId = $null
+    $critiqueMessages = [Collections.Generic.List[string]]::new()
     $lastParentMessage = $null
     $parentModel = $null
     $criticModel = $null
@@ -143,68 +116,56 @@ try {
         $event = ConvertFrom-Json -InputObject $line -AsHashtable
         $type = $event['type']
         $eventCounts[$type] = 1 + [int]$eventCounts[$type]
-        $agentId = $event['agentId']
         $data = $event['data']
-        if ($data -isnot [Collections.IDictionary]) { $data = @{} }
-        if ($type -eq 'model.call_start' -and -not $agentId -and -not $parentModel) {
-            $parentModel = $data['model']
+        if ($type -eq 'model.call_start' -and -not $parentModel) {
+            $parentModel = $data.model
         }
         elseif ($type -eq 'subagent.started') {
-            $agentsStarted += [ordered]@{ name = $data['agentName']; model = $data['model'] }
-            if ($requiredAgent -and $data['agentName'] -eq $requiredAgent) {
-                # A later invocation of the required agent supersedes earlier ones.
+            $agentsStarted += [ordered]@{ name = $data.agentName; model = $data.model }
+            if ($data.agentName -eq 'rubber-duck') {
+                # A later rubber-duck invocation supersedes earlier ones.
                 $started = $true
                 $completed = $false
-                $targetAgentId = $agentId
-                $resultMessages.Clear()
-                $criticModel = $data['model']
-                $modelSelection = $data['modelSelectionSource']
+                $rubberDuckAgentId = $event['agentId']
+                $critiqueMessages.Clear()
+                $criticModel = $data.model
+                $modelSelection = $data.modelSelectionSource
             }
         }
         elseif ($type -eq 'assistant.message') {
-            $content = $data['content']
+            $content = $data.content
             if ($content -isnot [string] -or -not $content.Trim()) { continue }
-            # Messages that also request tools are progress narration, not the answer.
-            $toolRequests = $data['toolRequests']
-            $isFinal = -not ($toolRequests -and @($toolRequests).Count -gt 0)
+            $agentId = $event['agentId']
             if ($agentId) {
-                if ($isFinal -and $targetAgentId -and $agentId -eq $targetAgentId -and -not $completed) {
-                    $resultMessages.Add($content)
+                # Messages that also request tools are progress narration, not the critique.
+                $hasToolRequests = $data.toolRequests -and @($data.toolRequests).Count -gt 0
+                if ($rubberDuckAgentId -and $agentId -eq $rubberDuckAgentId -and -not $completed -and -not $hasToolRequests) {
+                    $critiqueMessages.Add($content)
                 }
             }
-            else {
+            elseif (-not $started) {
                 $lastParentMessage = $content
-                if ($isFinal) { $parentFinalMessages.Add($content) }
             }
         }
-        elseif ($type -eq 'subagent.completed' -and $targetAgentId -and $agentId -eq $targetAgentId) {
+        elseif ($type -eq 'subagent.completed' -and $rubberDuckAgentId -and $event['agentId'] -eq $rubberDuckAgentId) {
             $completed = $true
         }
         elseif ($type -eq 'result') { $sessionExitCode = $event['exitCode'] }
     }
 
-    if (-not $requiredAgent) {
-        $started = $true
-        $completed = $true
-        foreach ($message in $parentFinalMessages) { $resultMessages.Add($message) }
-    }
-
     $metadata = [ordered]@{
         timestampUtc = [DateTimeOffset]::UtcNow.ToString('o')
-        mode = $Mode
         workingDirectory = $info.WorkingDirectory
         copilotExecutable = $copilot
-        requestedModel = $model
         parentModel = $parentModel
-        requiredAgent = $requiredAgent
         criticModel = $criticModel
         modelSelectionSource = $modelSelection
         copilotExitCode = $exitCode
         sessionExitCode = $sessionExitCode
-        requiredAgentStarted = $started
-        requiredAgentCompleted = $completed
+        rubberDuckStarted = $started
+        rubberDuckCompleted = $completed
         agentsStarted = $agentsStarted
-        outcome = if ($exitCode -eq 0 -and $sessionExitCode -eq 0 -and $completed -and $resultMessages.Count -gt 0) { 'success' } else { 'failed' }
+        outcome = if ($exitCode -eq 0 -and $sessionExitCode -eq 0 -and $completed -and $critiqueMessages.Count -gt 0) { 'success' } else { 'failed' }
         eventCounts = $eventCounts
     }
     [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
@@ -222,30 +183,18 @@ try {
         $reason = if ($lastParentMessage) { $lastParentMessage.Trim() } else { 'No parent response was recorded.' }
         if ($reason.Length -gt 500) { $reason = $reason.Substring(0, 500) + '...' }
         $status = if ($started) { 'started but did not complete' } else { 'was not invoked' }
-        throw "The built-in $requiredAgent subagent $status. Copilot said: $reason"
+        throw "The built-in rubber-duck subagent $status. Copilot said: $reason"
     }
-    if ($resultMessages.Count -eq 0) {
-        $who = if ($requiredAgent) { "The built-in $requiredAgent subagent" } else { 'Copilot' }
-        throw "$who completed without a final response."
-    }
-    $body = $resultMessages -join "`n`n"
-    if ($requiredAgent) {
-        $verifiedModel = if ($criticModel) { $criticModel } else { 'not reported' }
-        $selection = if ($modelSelection) { $modelSelection } else { 'not reported' }
-        $report = "**Verified $requiredAgent critic model:** ``$verifiedModel`` (Copilot selection: ``$selection``).`n`n$body"
-        $reportName = 'critique.md'
-    }
-    else {
-        $verifiedModel = if ($parentModel) { $parentModel } else { 'not reported' }
-        $access = if ($Mode -eq 'write') { 'write-enabled' } else { 'read-only' }
-        $report = "**Copilot CLI model:** ``$verifiedModel`` ($access).`n`n$body"
-        $reportName = 'result.md'
-    }
-    [IO.File]::WriteAllText((Join-Path $logDirectory $reportName), $report, [Text.UTF8Encoding]::new($false))
+    if ($critiqueMessages.Count -eq 0) { throw 'The built-in rubber-duck subagent completed without a critique.' }
+    $critique = $critiqueMessages -join "`n`n"
+    $verifiedModel = if ($criticModel) { $criticModel } else { 'not reported' }
+    $selection = if ($modelSelection) { $modelSelection } else { 'not reported' }
+    $report = "**Verified rubber-duck critic model:** ``$verifiedModel`` (Copilot selection: ``$selection``).`n`n$critique"
+    [IO.File]::WriteAllText((Join-Path $logDirectory 'critique.md'), $report, [Text.UTF8Encoding]::new($false))
     [Console]::Out.WriteLine($report)
 }
 catch {
-    [Console]::Error.WriteLine("Copilot bridge ($Mode) failed: $($_.Exception.Message)")
+    [Console]::Error.WriteLine("Rubber-duck bridge failed: $($_.Exception.Message)")
     if ($logDirectory) {
         try {
             [IO.File]::WriteAllText(

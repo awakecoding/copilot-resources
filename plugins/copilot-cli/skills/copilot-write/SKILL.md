@@ -4,11 +4,11 @@ description: Run a prompt through GitHub Copilot CLI with file-write and shell a
 argument-hint: [--model <id>] <prompt>
 disable-model-invocation: true
 context: fork
-agent: copilot-rubber-duck:copilot-cli-write
+agent: copilot-cli:copilot-cli-write
 background: false
 ---
 
-Forward the following complete request to the `copilot-rubber-duck:copilot-cli-write` agent's helper **verbatim**. Wait for the helper to finish and return Copilot's complete response in this turn; do not treat a log path or running Bash task as a result. Do not summarize the request or add other context.
+Forward the following complete request to the `copilot-cli:copilot-cli-write` agent's helper **verbatim**. Wait for the helper to finish and return Copilot's complete response in this turn; do not treat a log path or running Bash task as a result. Do not summarize the request or add other context.
 
 <request>
 $ARGUMENTS

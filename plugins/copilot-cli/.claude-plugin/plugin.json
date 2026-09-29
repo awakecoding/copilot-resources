@@ -1,0 +1,7 @@
+{
+  "name": "copilot-cli",
+  "description": "Run prompts through GitHub Copilot CLI from Claude Code, read-only by default with an opt-in write mode",
+  "author": {
+    "name": "awakecoding"
+  }
+}

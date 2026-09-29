@@ -1,6 +1,6 @@
 ---
 name: copilot-cli-write
-description: Run a prompt through GitHub Copilot CLI with file-write and shell access, only when the user explicitly requests it through /copilot-rubber-duck:copilot-write.
+description: Run a prompt through GitHub Copilot CLI with file-write and shell access, only when the user explicitly requests it through /copilot-cli:copilot-write.
 model: haiku
 tools: Bash, TaskOutput, Read
 maxTurns: 8
