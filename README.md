@@ -1,6 +1,6 @@
 # Copilot Resources
 
-Two [Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) for resumable engineering plans and staged migrations, plus a separate Claude Code plugin that runs GitHub Copilot CLI for independent critiques and general prompts.
+A Claude Code plugin that runs GitHub Copilot CLI for independent critiques and general prompts.
 
 ## Quick start: install and sign in to Copilot CLI
 
@@ -21,7 +21,7 @@ claude plugin marketplace add awakecoding/copilot-resources
 claude plugin install copilot@copilot-resources
 ```
 
-The first command registers the [marketplace manifest](.claude-plugin/marketplace.json) from GitHub; the second installs its `copilot` plugin. **This is not a local-checkout installation:** you do not need to clone this repository or copy files into `~/.claude/`. Installation defaults to user scope, making the commands available in your Claude Code projects. If you also want the two planning and migration skills, install the *separate* root plugin with `claude plugin install copilot-resources@copilot-resources`. Invoke those as `/copilot-resources:long-plan-orchestrator plan <goal>` and `/copilot-resources:migration-orchestrator plan <migration>`.
+The first command registers the [marketplace manifest](.claude-plugin/marketplace.json) from GitHub; the second installs its `copilot` plugin. **This is not a local-checkout installation:** you do not need to clone this repository or copy files into `~/.claude/`. Installation defaults to user scope, making the commands available in your Claude Code projects.
 
 Start a new Claude Code session to load a plugin installed from the terminal; in a running session, use `/reload-plugins` to apply it. Confirm with `claude plugin list` or type `/` in Claude Code to find `/copilot:prompt`, `/copilot:review`, `/copilot:security-review`, and `/copilot:rubber-duck`.
 
@@ -34,7 +34,7 @@ claude plugin marketplace update copilot-resources
 claude plugin update copilot@copilot-resources
 ```
 
-Restart Claude Code or run `/reload-plugins` in an open session to use the updated version. Update the optional root plugin separately with `claude plugin update copilot-resources@copilot-resources`. To remove and reinstall only the Copilot plugin, leave the marketplace registered and run:
+Restart Claude Code or run `/reload-plugins` in an open session to use the updated version. To remove and reinstall the Copilot plugin, leave the marketplace registered and run:
 
 ```text
 claude plugin uninstall copilot@copilot-resources
@@ -45,22 +45,7 @@ Restart or reload Claude Code after reinstalling. Uninstalling normally removes 
 
 ### Try a local checkout instead
 
-From a clone of this repository, run `claude --plugin-dir ./plugins/copilot` at the repository root to load **only** the Copilot plugin for that Claude Code session, without registering a marketplace or installing it. To try both plugins, run `claude --plugin-dir . --plugin-dir ./plugins/copilot` instead. This loads files from your checkout, not the GitHub-hosted marketplace; `claude plugin marketplace add ./` would register a *local* marketplace rather than the GitHub one. Use the GitHub installation above for normal use and updates.
-
-## Agent Skills (`skills/`)
-
-| Skill | Description |
-|-------|-------------|
-| [Long-Plan Orchestrator](skills/long-plan-orchestrator/SKILL.md) | Plan and resume multi-phase, dependency-aware work |
-| [Migration Orchestrator](skills/migration-orchestrator/SKILL.md) | Plan and resume batch migrations with rollback tracking |
-
-The two orchestrators live in the repository-root `skills/` folder. Outside the root Claude plugin, this is **not a default project-skill discovery path** for Copilot CLI, VS Code Copilot, or Cursor. Load them for your chosen host:
-
-- **Claude Code:** Use the root [plugin manifest](.claude-plugin/plugin.json) via the marketplace installation above or `claude --plugin-dir .` from this checkout.
-- **Copilot CLI:** Run `copilot skill add ./skills` once to register this checkout's skill directory, then `/skills reload` in an existing session. Invoke `/long-plan-orchestrator plan <goal>` or `/migration-orchestrator plan <migration>`. Registration is local to your machine; moving the checkout may require registering its new path.
-- **VS Code Copilot, Cursor, and other agents:** Use a supported project or personal skills location for that host (for example `.github/skills/` for VS Code Copilot or `.cursor/skills/` for Cursor), or configure a custom skills directory if that host supports it. Merely opening this repository does not activate root-level `skills/`.
-
-Each skill has a `SKILL.md` and supporting references. Invoke it with `plan` to create or review a plan, `execute` to resume approved work, or `status` for a read-only progress report. No sync script or VS Code-only `${input:...}` variables are required.
+From a clone of this repository, run `claude --plugin-dir ./plugins/copilot` at the repository root to load the Copilot plugin for that Claude Code session, without registering a marketplace or installing it. This loads files from your checkout, not the GitHub-hosted marketplace; `claude plugin marketplace add ./` would register a *local* marketplace rather than the GitHub one. Use the GitHub installation above for normal use and updates.
 
 ## Claude Code Copilot CLI plugin
 
