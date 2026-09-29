@@ -1,15 +1,10 @@
 {
   "name": "copilot-resources",
-  "description": "Claude Code plugins for orchestration and running GitHub Copilot CLI",
+  "description": "Claude Code plugin for running GitHub Copilot CLI",
   "owner": {
     "name": "awakecoding"
   },
   "plugins": [
-    {
-      "name": "copilot-resources",
-      "source": "./",
-      "description": "Resumable engineering planning and migration orchestration"
-    },
     {
       "name": "copilot",
       "source": "./plugins/copilot",
