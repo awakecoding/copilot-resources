@@ -1,4 +1,7 @@
 param(
+    [ValidateSet('review', 'security-review')][string]$ReviewType,
+    [string]$ClaudeSessionId,
+    [string]$StateDirectory,
     [switch]$Heredoc,
     [ValidateRange(1, 480)][int]$TimeoutSeconds = 480
 )
@@ -6,6 +9,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $logDirectory = $null
+$metadata = $null
 
 function Resolve-Copilot {
     $command = Get-Command copilot -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -29,7 +33,33 @@ function Resolve-Copilot {
     throw 'Copilot CLI was not found. Install it and ensure its directory is on PATH.'
 }
 
+function Save-SessionState($Path, $State) {
+    $temporaryPath = "$Path.$([guid]::NewGuid().ToString('N')).tmp"
+    try {
+        [IO.File]::WriteAllText($temporaryPath, ($State | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
+        if (-not $IsWindows) {
+            [IO.File]::SetUnixFileMode($temporaryPath, [IO.UnixFileMode]'UserRead,UserWrite')
+        }
+        [IO.File]::Move($temporaryPath, $Path, $true)
+    }
+    finally {
+        if ([IO.File]::Exists($temporaryPath)) { [IO.File]::Delete($temporaryPath) }
+    }
+}
+
+$stateLock = $null
 try {
+    if (-not $ReviewType) {
+        $parsedId = [guid]::Empty
+        if (-not [guid]::TryParse($ClaudeSessionId, [ref]$parsedId) -or -not $StateDirectory) {
+            throw 'A Claude session ID and plugin data directory are required for /copilot:prompt.'
+        }
+        $ClaudeSessionId = $parsedId.ToString()
+    }
+    elseif ($ClaudeSessionId -or $StateDirectory) {
+        throw 'Reviews use independent sessions; do not supply Claude session state.'
+    }
+
     $request = [Console]::In.ReadToEnd()
     if ($Heredoc) {
         if ($request.EndsWith("`r`n")) { $request = $request.Substring(0, $request.Length - 2) }
@@ -37,15 +67,40 @@ try {
         else { throw 'The request heredoc must end with a newline.' }
     }
 
+    $sessionAction = 'continue'
+    $resumeId = $null
     $model = $null
     $modelSelectionSource = 'default'
-    $match = [regex]::Match($request, '\A--model(?:=|[ \t]+)([A-Za-z0-9._:-]+)(?:[ \t]*\r?\n|[ \t]+)')
-    if ($match.Success) {
-        $model = $match.Groups[1].Value
-        $request = $request.Substring($match.Length)
-        $modelSelectionSource = 'explicit option'
+    if (-not $ReviewType) {
+        while ($true) {
+            $match = [regex]::Match($request, '\A--model(?:=|[ \t]+)([A-Za-z0-9._:-]+)(?:[ \t]*\r?\n|[ \t]+)')
+            if ($match.Success) {
+                if ($model) { throw 'Specify --model only once.' }
+                $model = $match.Groups[1].Value
+                $modelSelectionSource = 'explicit option'
+            }
+            else {
+                $match = [regex]::Match($request, '\A--new(?:[ \t]*\r?\n|[ \t]+)')
+                if ($match.Success) {
+                    if ($sessionAction -ne 'continue') { throw 'Choose only one session action.' }
+                    $sessionAction = 'new'
+                }
+                else {
+                    $match = [regex]::Match($request, '\A--resume(?:=|[ \t]+)([0-9a-fA-F-]+)(?:[ \t]*\r?\n|[ \t]+)')
+                    if (-not $match.Success) { break }
+                    if ($sessionAction -ne 'continue') { throw 'Choose only one session action.' }
+                    $parsedResumeId = [guid]::Empty
+                    if (-not [guid]::TryParse($match.Groups[1].Value, [ref]$parsedResumeId)) {
+                        throw 'Provide a full Copilot session UUID after --resume.'
+                    }
+                    $resumeId = $parsedResumeId.ToString()
+                    $sessionAction = 'resume'
+                }
+            }
+            $request = $request.Substring($match.Length)
+        }
     }
-    else {
+    if (-not $model -and -not $ReviewType) {
         $modelNames = @(
             'GPT[ -]?[0-9]+(?:\.[0-9]+)*(?:[ -](?:mini|codex|astra|sol|terra|luna))?'
             'Claude[ -](?:Opus|Sonnet|Haiku|Fable)[ -][0-9]+(?:\.[0-9]+)*(?:[ -]fast)?'
@@ -64,31 +119,96 @@ try {
             $modelSelectionSource = 'prompt'
         }
     }
-    if ([string]::IsNullOrWhiteSpace($request)) { throw 'Provide a prompt after the command.' }
+    if ([string]::IsNullOrWhiteSpace($request)) { throw 'Provide a request after the command.' }
 
-    $tools = @(
-        '--allow-tool=read', '--allow-tool=write', '--allow-tool=shell',
-        '--deny-tool=shell(git push)', '--deny-tool=url', '--deny-tool=memory'
-    )
+    $tools = if ($ReviewType) {
+        @(
+            '--allow-tool=read',
+            '--allow-tool=shell(git status),shell(git diff),shell(git log),shell(git show),shell(git rev-parse),shell(git merge-base),shell(git ls-files)',
+            '--deny-tool=write', '--deny-tool=url', '--deny-tool=memory', '--deny-tool=shell(git push)'
+        )
+    }
+    else {
+        @(
+            '--allow-tool=read', '--allow-tool=write', '--allow-tool=shell',
+            '--deny-tool=shell(git push)', '--deny-tool=url', '--deny-tool=memory'
+        )
+    }
 
     $copilot = Resolve-Copilot
+    $workingDirectory = [IO.Path]::TrimEndingDirectorySeparator([IO.Path]::GetFullPath((Get-Location).ProviderPath))
+    $targetSessionId = $null
+    $state = $null
+    $statePath = $null
+    if (-not $ReviewType) {
+        $normalizedDirectory = if ($IsWindows) { $workingDirectory.ToUpperInvariant() } else { $workingDirectory }
+        $key = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
+            [Text.Encoding]::UTF8.GetBytes("$ClaudeSessionId`n$normalizedDirectory")
+        )).ToLowerInvariant()
+        $sessionsDirectory = Join-Path ([IO.Path]::GetFullPath($StateDirectory)) 'sessions'
+        $null = New-Item -ItemType Directory -Path $sessionsDirectory -Force
+        if (-not $IsWindows) {
+            [IO.Directory]::SetUnixFileMode($sessionsDirectory, [IO.UnixFileMode]'UserRead,UserWrite,UserExecute')
+        }
+        $statePath = Join-Path $sessionsDirectory "$key.json"
+        try {
+            $stateLock = [IO.FileStream]::new("$statePath.lock", [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        }
+        catch [IO.IOException] {
+            throw 'Another Copilot prompt is using this Claude conversation and workspace; wait for it to finish.'
+        }
+        if ([IO.File]::Exists($statePath)) {
+            $state = ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($statePath)) -AsHashtable
+            if ($state.claudeSessionId -ne $ClaudeSessionId -or
+                $state.workingDirectory -ne $normalizedDirectory -or
+                $state.sessionIds -isnot [array] -or
+                $state.activeSessionId -notin $state.sessionIds) {
+                throw 'Copilot session state is invalid or belongs to a different conversation or workspace.'
+            }
+        }
+        else {
+            $state = @{ claudeSessionId = $ClaudeSessionId; workingDirectory = $normalizedDirectory; activeSessionId = $null; sessionIds = @() }
+        }
+        if ($sessionAction -eq 'resume') {
+            if ($resumeId -notin $state.sessionIds) {
+                throw "Copilot session $resumeId is not recorded for this Claude conversation and workspace."
+            }
+            $targetSessionId = $resumeId
+        }
+        elseif ($sessionAction -eq 'new' -or -not $state.activeSessionId) {
+            $targetSessionId = [guid]::NewGuid().ToString()
+            $sessionAction = 'new'
+        }
+        else {
+            $targetSessionId = $state.activeSessionId
+        }
+    }
     $logRoot = Join-Path $HOME '.claude/logs/copilot'
     $logDirectory = Join-Path $logRoot ("{0}-{1}" -f [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'), [guid]::NewGuid().ToString('N').Substring(0, 8))
     $null = New-Item -ItemType Directory -Path $logDirectory -Force
     if (-not $IsWindows) {
         [IO.Directory]::SetUnixFileMode($logDirectory, [IO.UnixFileMode]'UserRead,UserWrite,UserExecute')
     }
-    [Console]::Error.WriteLine("Copilot CLI (write-enabled) log: $logDirectory")
+    $label = if ($ReviewType) { $ReviewType } else { 'write-enabled' }
+    [Console]::Error.WriteLine("Copilot CLI ($label) log: $logDirectory")
 
+    $copilotPrompt = if ($ReviewType) {
+        $reviewerName = if ($ReviewType -eq 'review') { 'code-review' } else { 'security-review' }
+        "/$ReviewType Use the built-in $reviewerName subagent for this review; do not review the changes yourself. Review request: $request"
+    }
+    else { $request }
     $arguments = @(
-        '--prompt', $request,
+        '--prompt', $copilotPrompt,
         '--output-format=json', '--stream=off',
         '--no-ask-user', '--no-auto-update', '--disable-builtin-mcps'
     ) + $tools
     if ($model) { $arguments += @('--model', $model) }
+    if ($targetSessionId) {
+        $arguments += if ($sessionAction -eq 'new') { @('--session-id', $targetSessionId) } else { @('--resume', $targetSessionId) }
+    }
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $copilot
-    $info.WorkingDirectory = (Get-Location).ProviderPath
+    $info.WorkingDirectory = $workingDirectory
     $info.UseShellExecute = $false
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true
@@ -132,8 +252,15 @@ try {
     $output = [IO.File]::ReadAllText($eventsPath, [Text.Encoding]::UTF8)
 
     $resultMessages = [Collections.Generic.List[string]]::new()
+    $reviewMessages = [Collections.Generic.List[string]]::new()
+    $reviewerAgentId = $null
+    $reviewerCompleted = $false
+    $reviewerModel = $null
+    $reviewerModelSource = $null
+    $lastParentMessage = $null
     $parentModel = $null
     $sessionExitCode = $null
+    $resultSessionId = $null
     $agentsStarted = @()
     $eventCounts = @{}
     foreach ($line in ($output -split "`r?`n")) {
@@ -149,34 +276,59 @@ try {
         }
         elseif ($type -eq 'subagent.started') {
             $agentsStarted += [ordered]@{ name = $data['agentName']; model = $data['model'] }
+            if ($ReviewType -and $data['agentName'] -eq $reviewerName) {
+                $reviewerAgentId = $agentId
+                $reviewerCompleted = $false
+                $reviewerModel = $data['model']
+                $reviewerModelSource = $data['modelSelectionSource']
+                $reviewMessages.Clear()
+            }
         }
-        elseif ($type -eq 'assistant.message' -and -not $agentId) {
+        elseif ($type -eq 'assistant.message') {
             $content = $data['content']
-            # Messages that also request tools are progress narration, not the answer.
             $toolRequests = $data['toolRequests']
             $hasToolRequests = $toolRequests -and @($toolRequests).Count -gt 0
             if ($content -is [string] -and $content.Trim() -and -not $hasToolRequests) {
-                $resultMessages.Add($content)
+                if (-not $agentId) {
+                    $resultMessages.Add($content)
+                    $lastParentMessage = $content
+                }
+                elseif ($ReviewType -and $agentId -eq $reviewerAgentId -and -not $reviewerCompleted) {
+                    $reviewMessages.Add($content)
+                }
             }
         }
-        elseif ($type -eq 'result') { $sessionExitCode = $event['exitCode'] }
+        elseif ($type -eq 'subagent.completed' -and $ReviewType -and $agentId -eq $reviewerAgentId) {
+            $reviewerCompleted = $true
+        }
+        elseif ($type -eq 'result') {
+            $sessionExitCode = $event['exitCode']
+            $resultSessionId = $event['sessionId']
+        }
     }
 
     $metadata = [ordered]@{
         timestampUtc = [DateTimeOffset]::UtcNow.ToString('o')
-        mode = 'write'
+        mode = if ($ReviewType) { 'read' } else { 'write' }
+        reviewType = $ReviewType
         workingDirectory = $info.WorkingDirectory
         copilotExecutable = $copilot
+        claudeSessionId = $ClaudeSessionId
+        sessionAction = if ($ReviewType) { 'independent' } else { $sessionAction }
+        sessionId = $resultSessionId
         requestedModel = $model
         modelSelectionSource = $modelSelectionSource
         parentModel = $parentModel
         copilotExitCode = $exitCode
         sessionExitCode = $sessionExitCode
         agentsStarted = $agentsStarted
-        outcome = if ($exitCode -eq 0 -and $sessionExitCode -eq 0 -and $resultMessages.Count -gt 0) { 'success' } else { 'failed' }
+        reviewerAgentId = $reviewerAgentId
+        reviewerCompleted = $reviewerCompleted
+        reviewerModel = $reviewerModel
+        reviewerModelSelectionSource = $reviewerModelSource
+        outcome = 'failed'
         eventCounts = $eventCounts
     }
-    [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
 
     if ($exitCode -ne 0) {
         throw "Copilot CLI exited with code $exitCode. See stderr.txt and events.jsonl."
@@ -184,16 +336,39 @@ try {
     if ($sessionExitCode -ne 0) {
         throw "Copilot session ended with exit code $sessionExitCode. See events.jsonl."
     }
-    if ($resultMessages.Count -eq 0) { throw 'Copilot completed without a final response.' }
-
-    $verifiedModel = if ($parentModel) { $parentModel } else { 'not reported' }
-    $report = "**Copilot CLI model:** ``$verifiedModel`` (write-enabled).`n`n" + ($resultMessages -join "`n`n")
+    if ($ReviewType) {
+        if (-not $reviewerCompleted) {
+            $reason = if ($lastParentMessage) { $lastParentMessage.Trim() } else { 'No parent response was recorded.' }
+            if ($reason.Length -gt 500) { $reason = $reason.Substring(0, 500) + '...' }
+            throw "The built-in $ReviewType reviewer did not complete. Copilot said: $reason"
+        }
+        if ($reviewMessages.Count -eq 0) { throw "The built-in $ReviewType reviewer completed without a review." }
+        $reviewLabel = if ($ReviewType -eq 'review') { 'code review' } else { 'security review' }
+        $modelLabel = if ($reviewerModel) { $reviewerModel } else { 'not reported' }
+        $report = "**Verified Copilot $reviewLabel** (read-only; reviewer model: ``$modelLabel``).`n`n" + ($reviewMessages -join "`n`n")
+    }
+    else {
+        if ($resultMessages.Count -eq 0) { throw 'Copilot completed without a final response.' }
+        if ($resultSessionId -ne $targetSessionId) { throw "Copilot returned an unexpected session ID: $resultSessionId" }
+        $state.activeSessionId = $targetSessionId
+        if ($targetSessionId -notin $state.sessionIds) { $state.sessionIds += $targetSessionId }
+        Save-SessionState $statePath $state
+        $verifiedModel = if ($parentModel) { $parentModel } else { 'not reported' }
+        $report = "**Copilot CLI model:** ``$verifiedModel`` (write-enabled).`n**Copilot session:** ``$targetSessionId`` ($sessionAction).`n`n" + ($resultMessages -join "`n`n")
+    }
+    $metadata.outcome = 'success'
+    [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $logDirectory 'result.md'), $report, [Text.UTF8Encoding]::new($false))
     [Console]::Out.WriteLine($report)
 }
 catch {
-    [Console]::Error.WriteLine("Copilot CLI (write-enabled) failed: $($_.Exception.Message)")
+    $label = if ($ReviewType) { $ReviewType } else { 'write-enabled' }
+    [Console]::Error.WriteLine("Copilot CLI ($label) failed: $($_.Exception.Message)")
     if ($logDirectory) {
+        if ($metadata) {
+            $metadata.outcome = 'failed'
+            [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
+        }
         try {
             [IO.File]::WriteAllText(
                 (Join-Path $logDirectory 'failure.txt'),
@@ -204,4 +379,7 @@ catch {
         catch { [Console]::Error.WriteLine("Could not save failure log: $($_.Exception.Message)") }
     }
     exit 1
+}
+finally {
+    if ($stateLock) { $stateLock.Dispose() }
 }
