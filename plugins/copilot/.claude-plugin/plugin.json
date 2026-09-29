@@ -1,0 +1,7 @@
+{
+  "name": "copilot",
+  "description": "Run GitHub Copilot CLI from Claude Code: verified read-only reviews, resumable prompts, and rubber-duck critiques",
+  "author": {
+    "name": "awakecoding"
+  }
+}

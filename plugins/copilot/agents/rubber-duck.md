@@ -1,6 +1,6 @@
 ---
-name: copilot-rubber-duck
-description: Invoke the real GitHub Copilot CLI rubber duck when the user explicitly requests an independent critique through /copilot-rubber-duck:rubber-duck.
+name: rubber-duck
+description: Invoke the real GitHub Copilot CLI rubber duck when the user explicitly requests an independent critique through /copilot:rubber-duck.
 model: haiku
 tools: Bash, TaskOutput, Read
 maxTurns: 8

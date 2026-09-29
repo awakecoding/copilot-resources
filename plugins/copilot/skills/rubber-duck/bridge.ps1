@@ -102,7 +102,8 @@ try {
 
     $started = $false
     $completed = $false
-    $critique = $null
+    $rubberDuckAgentId = $null
+    $critiqueMessages = [Collections.Generic.List[string]]::new()
     $lastParentMessage = $null
     $parentModel = $null
     $criticModel = $null
@@ -122,20 +123,31 @@ try {
         elseif ($type -eq 'subagent.started') {
             $agentsStarted += [ordered]@{ name = $data.agentName; model = $data.model }
             if ($data.agentName -eq 'rubber-duck') {
+                # A later rubber-duck invocation supersedes earlier ones.
                 $started = $true
+                $completed = $false
+                $rubberDuckAgentId = $event['agentId']
+                $critiqueMessages.Clear()
                 $criticModel = $data.model
                 $modelSelection = $data.modelSelectionSource
             }
         }
         elseif ($type -eq 'assistant.message') {
-            if ($started -and -not $completed -and $data.content -is [string] -and $data.content.Trim()) {
-                $critique = $data.content
+            $content = $data.content
+            if ($content -isnot [string] -or -not $content.Trim()) { continue }
+            $agentId = $event['agentId']
+            if ($agentId) {
+                # Messages that also request tools are progress narration, not the critique.
+                $hasToolRequests = $data.toolRequests -and @($data.toolRequests).Count -gt 0
+                if ($rubberDuckAgentId -and $agentId -eq $rubberDuckAgentId -and -not $completed -and -not $hasToolRequests) {
+                    $critiqueMessages.Add($content)
+                }
             }
-            elseif (-not $started -and $data.content -is [string] -and $data.content.Trim()) {
-                $lastParentMessage = $data.content
+            elseif (-not $started) {
+                $lastParentMessage = $content
             }
         }
-        elseif ($type -eq 'subagent.completed' -and $data.agentName -eq 'rubber-duck') {
+        elseif ($type -eq 'subagent.completed' -and $rubberDuckAgentId -and $event['agentId'] -eq $rubberDuckAgentId) {
             $completed = $true
         }
         elseif ($type -eq 'result') { $sessionExitCode = $event['exitCode'] }
@@ -153,7 +165,7 @@ try {
         rubberDuckStarted = $started
         rubberDuckCompleted = $completed
         agentsStarted = $agentsStarted
-        outcome = if ($exitCode -eq 0 -and $sessionExitCode -eq 0 -and $completed -and $critique) { 'success' } else { 'failed' }
+        outcome = if ($exitCode -eq 0 -and $sessionExitCode -eq 0 -and $completed -and $critiqueMessages.Count -gt 0) { 'success' } else { 'failed' }
         eventCounts = $eventCounts
     }
     [IO.File]::WriteAllText((Join-Path $logDirectory 'metadata.json'), ($metadata | ConvertTo-Json -Depth 5), [Text.UTF8Encoding]::new($false))
@@ -173,7 +185,8 @@ try {
         $status = if ($started) { 'started but did not complete' } else { 'was not invoked' }
         throw "The built-in rubber-duck subagent $status. Copilot said: $reason"
     }
-    if (-not $critique) { throw 'The built-in rubber-duck subagent completed without a critique.' }
+    if ($critiqueMessages.Count -eq 0) { throw 'The built-in rubber-duck subagent completed without a critique.' }
+    $critique = $critiqueMessages -join "`n`n"
     $verifiedModel = if ($criticModel) { $criticModel } else { 'not reported' }
     $selection = if ($modelSelection) { $modelSelection } else { 'not reported' }
     $report = "**Verified rubber-duck critic model:** ``$verifiedModel`` (Copilot selection: ``$selection``).`n`n$critique"
