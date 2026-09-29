@@ -20,4 +20,4 @@ Copilot CLI may resolve a model named in the request (for example, "using Grok 4
 
 Diagnostic logs are stored under `~/.claude/logs/rubber-duck/` (including `critique.md`, `events.jsonl`, `stderr.txt`, and `metadata.json`). Their raw event stream can contain the request, code, and review output; keep them private.
 
-Reviews have a 20-minute timeout. The transport waits for the same Bash task if it moves to the background; it does not return a pending review as a result. Read-only Git history commands are allowed, but writes, external URLs, and pushes remain denied. Timed-out runs retain failed metadata and partial events, not a verified critique.
+Reviews have a 90-minute timeout. The transport waits for the same Bash task if it moves to the background; it does not return a pending review as a result. Read-only Git history commands are allowed, but writes, external URLs, and pushes remain denied. Timed-out runs retain failed metadata and partial events, not a verified critique.

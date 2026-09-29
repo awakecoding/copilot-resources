@@ -1,6 +1,6 @@
 param(
     [switch]$Heredoc,
-    [ValidateRange(1, 1200)][int]$TimeoutSeconds = 1200
+    [ValidateRange(1, 5400)][int]$TimeoutSeconds = 5400
 )
 
 Set-StrictMode -Version Latest
