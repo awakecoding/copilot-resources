@@ -4,11 +4,11 @@ description: Ask GitHub Copilot CLI's built-in rubber duck for an independent, r
 argument-hint: <review request>
 disable-model-invocation: true
 context: fork
-agent: copilot-cli:copilot-rubber-duck
+agent: copilot:copilot-rubber-duck
 background: false
 ---
 
-Forward the following complete review request to the `copilot-cli:copilot-rubber-duck` agent's helper **verbatim**. Wait for the helper to finish and return its complete critique in this turn; do not treat a log path or running Bash task as a review result. Do not summarize the request, select a model, or add other context. The PowerShell 7 helper sends `/rubber-duck ` plus your request directly to Copilot CLI without a model flag, keeps it read-only, verifies that its built-in rubber-duck subagent ran, and records local diagnostic logs.
+Forward the following complete review request to the `copilot:copilot-rubber-duck` agent's helper **verbatim**. Wait for the helper to finish and return its complete critique in this turn; do not treat a log path or running Bash task as a review result. Do not summarize the request, select a model, or add other context. The PowerShell 7 helper sends `/rubber-duck ` plus your request directly to Copilot CLI without a model flag, keeps it read-only, verifies that its built-in rubber-duck subagent ran, and records local diagnostic logs.
 
 <review_request>
 $ARGUMENTS

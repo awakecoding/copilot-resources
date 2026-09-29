@@ -1,6 +1,6 @@
 ---
 name: copilot-cli
-description: Run a prompt through GitHub Copilot CLI in read-only mode when the user explicitly requests it through /copilot-cli:prompt.
+description: Run a prompt through GitHub Copilot CLI in read-only mode when the user explicitly requests it through /copilot:prompt.
 model: haiku
 tools: Bash, TaskOutput, Read
 maxTurns: 8

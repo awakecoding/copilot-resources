@@ -11,8 +11,8 @@
       "description": "Resumable engineering planning and migration orchestration"
     },
     {
-      "name": "copilot-cli",
-      "source": "./plugins/copilot-cli",
+      "name": "copilot",
+      "source": "./plugins/copilot",
       "description": "GitHub Copilot CLI from Claude Code: verified rubber-duck critiques and read-only or opt-in write prompts"
     }
   ]

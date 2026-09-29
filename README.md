@@ -9,12 +9,12 @@ After these files are committed and available on the repository's default branch
 ```text
 claude plugin marketplace add awakecoding/copilot-resources
 claude plugin install copilot-resources@copilot-resources
-claude plugin install copilot-cli@copilot-resources
+claude plugin install copilot@copilot-resources
 ```
 
-Install only the plugin(s) you need. Invoke the orchestrators with `/copilot-resources:long-plan-orchestrator plan <goal>` or `/copilot-resources:migration-orchestrator plan <migration>`. Invoke the Copilot commands with `/copilot-cli:rubber-duck <review request>`, `/copilot-cli:prompt <prompt>`, or `/copilot-cli:prompt-write <prompt>`. Claude Code namespaces plugin commands by plugin name; see [a shorter `/rubber-duck`](#optional-rubber-duck-shortcut) to add an unprefixed alias. To update an installation later, run `claude plugin update <plugin-name>@copilot-resources`. The plugin manifests intentionally omit fixed versions so Git commit SHAs identify updates.
+Install only the plugin(s) you need. Invoke the orchestrators with `/copilot-resources:long-plan-orchestrator plan <goal>` or `/copilot-resources:migration-orchestrator plan <migration>`. Invoke the Copilot commands with `/copilot:rubber-duck <review request>`, `/copilot:prompt <prompt>`, or `/copilot:prompt-write <prompt>`. Claude Code namespaces plugin commands by plugin name; see [a shorter `/rubber-duck`](#optional-rubber-duck-shortcut) to add an unprefixed alias. To update an installation later, run `claude plugin update <plugin-name>@copilot-resources`. The plugin manifests intentionally omit fixed versions so Git commit SHAs identify updates.
 
-To try the checkout without installing anything, run `claude --plugin-dir . --plugin-dir ./plugins/copilot-cli` from this repository's root.
+To try the checkout without installing anything, run `claude --plugin-dir . --plugin-dir ./plugins/copilot` from this repository's root.
 
 ## Agent Skills (`skills/`)
 
@@ -33,32 +33,32 @@ Each skill has a `SKILL.md` and supporting references. Invoke it with `plan` to 
 
 ## Claude Code Copilot CLI plugin
 
-The [copilot-cli plugin](plugins/copilot-cli/.claude-plugin/plugin.json) runs GitHub Copilot CLI as a subprocess in your current project. Each command has a dedicated transport agent that resolves its PowerShell 7 bridge inside the installed plugin. No copy to `~/.claude/` or checkout of this repository is needed after installation.
+The [copilot plugin](plugins/copilot/.claude-plugin/plugin.json) runs GitHub Copilot CLI as a subprocess in your current project. Each command has a dedicated transport agent that resolves its PowerShell 7 bridge inside the installed plugin. No copy to `~/.claude/` or checkout of this repository is needed after installation.
 
 | Command | Agent | Access |
 |---------|-------|--------|
-| [`/copilot-cli:rubber-duck <review request>`](plugins/copilot-cli/skills/rubber-duck/SKILL.md) | [`copilot-rubber-duck`](plugins/copilot-cli/agents/copilot-rubber-duck.md) | Read-only; verifies that Copilot's built-in rubber-duck subagent produced the critique |
-| [`/copilot-cli:prompt [--model <id>] <prompt>`](plugins/copilot-cli/skills/prompt/SKILL.md) | [`copilot-cli`](plugins/copilot-cli/agents/copilot-cli.md) | Read-only: file reads plus `git status`/`git diff` |
-| [`/copilot-cli:prompt-write [--model <id>] <prompt>`](plugins/copilot-cli/skills/prompt-write/SKILL.md) | [`copilot-cli-write`](plugins/copilot-cli/agents/copilot-cli-write.md) | Can edit files under the working directory and run shell commands except `git push`; URL and memory tools are denied |
+| [`/copilot:rubber-duck <review request>`](plugins/copilot/skills/rubber-duck/SKILL.md) | [`copilot-rubber-duck`](plugins/copilot/agents/copilot-rubber-duck.md) | Read-only; verifies that Copilot's built-in rubber-duck subagent produced the critique |
+| [`/copilot:prompt [--model <id>] <prompt>`](plugins/copilot/skills/prompt/SKILL.md) | [`copilot-cli`](plugins/copilot/agents/copilot-cli.md) | Read-only: file reads plus `git status`/`git diff` |
+| [`/copilot:prompt-write [--model <id>] <prompt>`](plugins/copilot/skills/prompt-write/SKILL.md) | [`copilot-cli-write`](plugins/copilot/agents/copilot-cli-write.md) | Can edit files under the working directory and run shell commands except `git push`; URL and memory tools are denied |
 
-The bridges require `pwsh` and an authenticated GitHub `copilot` CLI. The [rubber-duck bridge](plugins/copilot-cli/skills/rubber-duck/bridge.ps1) forwards `/rubber-duck <review request>` without selecting a model and checks the JSON events for the actual built-in rubber-duck subagent. The [prompt bridge](plugins/copilot-cli/scripts/copilot-bridge.ps1) accepts an optional leading `--model <id>`. Each agent hardcodes its bridge mode, so a prompt cannot escalate read-only access to write access. Write mode's shell commands are not sandboxed; avoid running it while Claude is editing the same files. Runs are limited to 480 seconds. Diagnostic logs under `~/.claude/logs/rubber-duck/` and `~/.claude/logs/copilot-cli/` can contain requests, code, and output; keep them private and out of version control.
+The bridges require `pwsh` and an authenticated GitHub `copilot` CLI. The [rubber-duck bridge](plugins/copilot/skills/rubber-duck/bridge.ps1) forwards `/rubber-duck <review request>` without selecting a model and checks the JSON events for the actual built-in rubber-duck subagent. The [prompt bridge](plugins/copilot/scripts/copilot-bridge.ps1) accepts an optional leading `--model <id>`. Each agent hardcodes its bridge mode, so a prompt cannot escalate read-only access to write access. Write mode's shell commands are not sandboxed; avoid running it while Claude is editing the same files. Runs are limited to 480 seconds. Diagnostic logs under `~/.claude/logs/rubber-duck/` and `~/.claude/logs/copilot-cli/` can contain requests, code, and output; keep them private and out of version control.
 
 ### Optional `/rubber-duck` shortcut
 
-Plugin commands always include the plugin prefix. For an unprefixed `/rubber-duck`, save the following as `~/.claude/skills/rubber-duck/SKILL.md`. It delegates to the plugin's agent, so it requires the `copilot-cli` plugin and picks up plugin updates:
+Plugin commands always include the plugin prefix. For an unprefixed `/rubber-duck`, save the following as `~/.claude/skills/rubber-duck/SKILL.md`. It delegates to the plugin's agent, so it requires the `copilot` plugin and picks up plugin updates:
 
 ```markdown
 ---
 name: rubber-duck
-description: Shortcut for /copilot-cli:rubber-duck. Ask GitHub Copilot CLI's built-in rubber duck for an independent, read-only critique.
+description: Shortcut for /copilot:rubber-duck. Ask GitHub Copilot CLI's built-in rubber duck for an independent, read-only critique.
 argument-hint: <review request>
 disable-model-invocation: true
 context: fork
-agent: copilot-cli:copilot-rubber-duck
+agent: copilot:copilot-rubber-duck
 background: false
 ---
 
-Forward the following complete review request to the `copilot-cli:copilot-rubber-duck` agent's helper **verbatim**. Wait for the helper to finish and return its complete critique in this turn; do not treat a log path or running Bash task as a review result. Do not summarize the request, select a model, or add other context.
+Forward the following complete review request to the `copilot:copilot-rubber-duck` agent's helper **verbatim**. Wait for the helper to finish and return its complete critique in this turn; do not treat a log path or running Bash task as a review result. Do not summarize the request, select a model, or add other context.
 
 <review_request>
 $ARGUMENTS

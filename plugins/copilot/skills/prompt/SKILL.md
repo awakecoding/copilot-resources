@@ -4,17 +4,17 @@ description: Run a prompt through GitHub Copilot CLI in read-only mode and retur
 argument-hint: [--model <id>] <prompt>
 disable-model-invocation: true
 context: fork
-agent: copilot-cli:copilot-cli
+agent: copilot:copilot-cli
 background: false
 ---
 
-Forward the following complete request to the `copilot-cli:copilot-cli` agent's helper **verbatim**. Wait for the helper to finish and return Copilot's complete response in this turn; do not treat a log path or running Bash task as a result. Do not summarize the request or add other context.
+Forward the following complete request to the `copilot:copilot-cli` agent's helper **verbatim**. Wait for the helper to finish and return Copilot's complete response in this turn; do not treat a log path or running Bash task as a result. Do not summarize the request or add other context.
 
 <request>
 $ARGUMENTS
 </request>
 
-The Copilot subprocess starts in the current working directory and can read its files and run `git status`/`git diff`, but cannot write files, use URLs, use memory, or see this Claude conversation. Include any chat-only context in the request. For write access, use `/copilot-cli:prompt-write`.
+The Copilot subprocess starts in the current working directory and can read its files and run `git status`/`git diff`, but cannot write files, use URLs, use memory, or see this Claude conversation. Include any chat-only context in the request. For write access, use `/copilot:prompt-write`.
 
 To select a model, begin the request with `--model <id>` (for example, `--model gpt-5.4 explain src/main.rs`). Otherwise, Copilot CLI uses its default model. The model used is reported in the result.
 
