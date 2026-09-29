@@ -1,0 +1,7 @@
+{
+  "name": "copilot-rubber-duck",
+  "description": "Verified read-only critiques from GitHub Copilot CLI's built-in rubber-duck agent",
+  "author": {
+    "name": "awakecoding"
+  }
+}

@@ -1,70 +1,38 @@
 # Copilot Resources
 
-Curated [Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills), legacy GitHub Copilot [prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), and [custom instructions](https://code.visualstudio.com/docs/agent-customization/custom-instructions) for development workflows.
+Two [Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) for resumable engineering plans and staged migrations, plus a separate Claude Code plugin for independent Copilot critiques.
 
-## Agent Skills (`SKILL.md`)
+## Install from the Claude Code marketplace
+
+After these files are committed and available on the repository's default branch, add this repository as a [Claude Code marketplace](.claude-plugin/marketplace.json) and install either plugin:
+
+```text
+claude plugin marketplace add awakecoding/copilot-resources
+claude plugin install copilot-resources@copilot-resources
+claude plugin install copilot-rubber-duck@copilot-resources
+```
+
+Install only the plugin(s) you need. Invoke the orchestrators with `/copilot-resources:long-plan-orchestrator plan <goal>` or `/copilot-resources:migration-orchestrator plan <migration>`. Invoke the rubber duck with `/copilot-rubber-duck:rubber-duck <review request>`. Plugin commands are namespaced; an existing personal `/rubber-duck` skill is separate and does not need to be replaced. To update an installation later, run `claude plugin update <plugin-name>@copilot-resources`. The plugin manifests intentionally omit fixed versions so Git commit SHAs identify updates.
+
+To try the checkout without installing anything, run `claude --plugin-dir . --plugin-dir ./plugins/copilot-rubber-duck` from this repository's root.
+
+## Agent Skills (`skills/`)
 
 | Skill | Description |
 |-------|-------------|
-| [Prompt Crafter](.claude/skills/prompt-crafter/SKILL.md) | Design reusable prompts, skills, instructions, and agents for the intended host |
-| [Rubber Duck](.claude/skills/rubber-duck/SKILL.md) | Ask Copilot CLI's built-in rubber-duck subagent for a verified, read-only critique from Claude Code |
+| [Long-Plan Orchestrator](skills/long-plan-orchestrator/SKILL.md) | Plan and resume multi-phase, dependency-aware work |
+| [Migration Orchestrator](skills/migration-orchestrator/SKILL.md) | Plan and resume batch migrations with rollback tracking |
 
-Skills in `.claude/skills/` are discovered by Claude Code, VS Code Copilot, and Cursor when working in this repository. The rubber-duck skill is **Claude Code-specific**: its [agent](.claude/agents/copilot-rubber-duck.md) invokes a [PowerShell 7 bridge](.claude/skills/rubber-duck/bridge.ps1) at a *personal* `~/.claude/skills/rubber-duck/bridge.ps1` path. To use `/rubber-duck` in other repositories, install the two skill files and the agent under your personal Claude directory (review existing files before replacing them):
+The two orchestrators live in the repository-root `skills/` folder. Outside the root Claude plugin, this is **not a default project-skill discovery path** for Copilot CLI, VS Code Copilot, or Cursor. Load them for your chosen host:
 
-```powershell
-$skillDir = Join-Path $HOME '.claude/skills/rubber-duck'
-$agentDir = Join-Path $HOME '.claude/agents'
-New-Item -ItemType Directory -Force $skillDir, $agentDir | Out-Null
-Copy-Item .claude/skills/rubber-duck/SKILL.md $skillDir
-Copy-Item .claude/skills/rubber-duck/bridge.ps1 $skillDir
-Copy-Item .claude/agents/copilot-rubber-duck.md $agentDir
-```
+- **Claude Code:** Use the root [plugin manifest](.claude-plugin/plugin.json) via the marketplace installation above or `claude --plugin-dir .` from this checkout.
+- **Copilot CLI:** Run `copilot skill add ./skills` once to register this checkout's skill directory, then `/skills reload` in an existing session. Invoke `/long-plan-orchestrator plan <goal>` or `/migration-orchestrator plan <migration>`. Registration is local to your machine; moving the checkout may require registering its new path.
+- **VS Code Copilot, Cursor, and other agents:** Use a supported project or personal skills location for that host (for example `.github/skills/` for VS Code Copilot or `.cursor/skills/` for Cursor), or configure a custom skills directory if that host supports it. Merely opening this repository does not activate root-level `skills/`.
 
-Run these commands from this repository's root. The bridge requires `pwsh` and an authenticated `copilot` CLI; invoke `/rubber-duck <review request>` in Claude Code. It passes the request verbatim to Copilot CLI without selecting a model, verifies the actual rubber-duck agent in JSON events, and restricts tool access. Diagnostic logs in `~/.claude/logs/rubber-duck/` can contain the request, code, and critique: keep them private and out of version control. Copying the skill into this repository alone does **not** make the agent's personal helper path available on a new machine.
+Each skill has a `SKILL.md` and supporting references. Invoke it with `plan` to create or review a plan, `execute` to resume approved work, or `status` for a read-only progress report. No sync script or VS Code-only `${input:...}` variables are required.
 
-## Prompts (`.prompt.md`)
+## Claude Code rubber duck
 
-Reusable prompts for common development tasks. Run with `/prompt-name` in VS Code's Local agent; [Agent Host does not load prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), so use skills for new cross-agent workflows. This collection remains available for existing users. It is stored in `prompts/` as a source library rather than an automatically discovered workspace `.github/prompts/` directory.
+The [rubber-duck plugin](plugins/copilot-rubber-duck/.claude-plugin/plugin.json) bundles its [skill](plugins/copilot-rubber-duck/skills/rubber-duck/SKILL.md), [agent](plugins/copilot-rubber-duck/agents/copilot-rubber-duck.md), and [PowerShell 7 bridge](plugins/copilot-rubber-duck/skills/rubber-duck/bridge.ps1). The agent resolves the bridge inside the installed plugin, while starting the Copilot subprocess in your current project. No copy to `~/.claude/` or checkout of this repository is needed after installation.
 
-| Prompt | Description |
-|--------|-------------|
-| [Git Create Logical Commits](prompts/git-create-logical-commits.prompt.md) | Create atomic, well-organized commits from unstaged changes |
-| [Git Create Worktree](prompts/git-create-worktree.prompt.md) | Create a new Git worktree with proper naming conventions and branch setup |
-| [Git Delete Worktree](prompts/git-delete-worktree.prompt.md) | Remove a Git worktree and optionally delete its associated branch |
-| [Git Unstage Branch Commits](prompts/git-unstage-branch-commits.prompt.md) | Recreate branch changes as unstaged edits on a fresh branch |
-| [Long-Plan Orchestrator](prompts/long-plan-orchestrator.prompt.md) | Multi-phase project execution with dependency management and progress tracking |
-| [Migration Orchestrator](prompts/migration-orchestrator.prompt.md) | Large-scale migrations with progress tracking and rollback |
-| [Prompt Crafter](prompts/prompt-crafter.prompt.md) | Interactive assistant for creating well-structured .prompt.md files |
-
-## Instructions (`.instructions.md`)
-
-Guidelines that automatically influence AI responses for specific file types.
-
-| Instruction | Description |
-|-------------|-------------|
-| [Technical Blogging Style](instructions/technical-blogging-style.instructions.md) | Standards for authoritative technical content |
-
-## Scripts
-
-Utility scripts for managing Copilot resources.
-
-| Script | Description |
-|--------|-------------|
-| [Sync-VSCodeUserPrompts.ps1](scripts/Sync-VSCodeUserPrompts.ps1) | Synchronizes prompt files to VS Code profiles, Cursor IDE, and Claude Code |
-
-### Usage
-
-```powershell
-# Synchronize legacy prompts to installed VS Code profiles, Cursor, and Claude Code
-.\scripts\Sync-VSCodeUserPrompts.ps1
-
-# Preview changes without copying files
-.\scripts\Sync-VSCodeUserPrompts.ps1 -DryRun
-```
-
-The script automatically detects and synchronizes prompts to:
-- **VS Code** (Stable and Insiders) - Copies `.prompt.md` files to the default and named user profiles' `prompts` directories
-- **Cursor IDE** - Copies as `.md` files to `~/.cursor/commands` (if `~/.cursor` exists)
-- **Claude Code** - Copies as `.md` files to `~/.claude/commands` (if `~/.claude` exists)
-
-This is a **legacy prompt sync**, not a skill installer: VS Code-specific prompt metadata and input variables might not work in other hosts. It overwrites same-named command/prompt files at the destinations, does not delete stale copies, and does not install the rubber-duck skill or agent. Use `-DryRun` to inspect destinations first. Works across Windows, macOS, and Linux with PowerShell 7 (and Windows PowerShell 5.1 on Windows).
+The bridge requires `pwsh` and an authenticated GitHub `copilot` CLI. It forwards `/rubber-duck <review request>` without selecting a model, checks the JSON events for the actual built-in rubber-duck subagent, and limits tool access to read-only operations. Diagnostic logs under `~/.claude/logs/rubber-duck/` can contain the request, code, and critique; keep them private and out of version control.
