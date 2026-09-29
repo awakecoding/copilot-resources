@@ -1,6 +1,6 @@
 {
   "name": "copilot-resources",
-  "description": "Claude Code plugins for orchestration and independent Copilot critiques",
+  "description": "Claude Code plugins for orchestration and running GitHub Copilot CLI",
   "owner": {
     "name": "awakecoding"
   },
@@ -13,7 +13,7 @@
     {
       "name": "copilot-rubber-duck",
       "source": "./plugins/copilot-rubber-duck",
-      "description": "Verified read-only critiques from GitHub Copilot CLI"
+      "description": "Rubber-duck critiques and general prompts via GitHub Copilot CLI"
     }
   ]
 }
