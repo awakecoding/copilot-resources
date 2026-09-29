@@ -1,7 +1,7 @@
 ---
 name: prompt
 description: Run a prompt through GitHub Copilot CLI with file-write and shell access, then return its response.
-argument-hint: [--model <id>] [--new | --resume <session-id>] <prompt>
+argument-hint: '[--model <id>] [--new | --resume <session-id>] <prompt>'
 disable-model-invocation: true
 context: fork
 agent: copilot:prompt
