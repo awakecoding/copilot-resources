@@ -1,5 +1,5 @@
 ---
-name: copilot-write
+name: prompt-write
 description: Run a prompt through GitHub Copilot CLI with file-write and shell access, then return its response.
 argument-hint: [--model <id>] <prompt>
 disable-model-invocation: true
