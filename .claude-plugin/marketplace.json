@@ -13,7 +13,7 @@
     {
       "name": "copilot",
       "source": "./plugins/copilot",
-      "description": "GitHub Copilot CLI from Claude Code: verified rubber-duck critiques and read-only or opt-in write prompts"
+      "description": "GitHub Copilot CLI from Claude Code: verified read-only rubber-duck critiques and write-enabled prompts"
     }
   ]
 }

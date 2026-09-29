@@ -1,5 +1,4 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('read', 'write')][string]$Mode,
     [switch]$Heredoc,
     [ValidateRange(1, 480)][int]$TimeoutSeconds = 480
 )
@@ -46,7 +45,7 @@ try {
         $request = $request.Substring($match.Length)
         $modelSelectionSource = 'explicit option'
     }
-    elseif ($Mode -eq 'read') {
+    else {
         $modelNames = @(
             'GPT[ -]?[0-9]+(?:\.[0-9]+)*(?:[ -](?:mini|codex|astra|sol|terra|luna))?'
             'Claude[ -](?:Opus|Sonnet|Haiku|Fable)[ -][0-9]+(?:\.[0-9]+)*(?:[ -]fast)?'
@@ -67,18 +66,10 @@ try {
     }
     if ([string]::IsNullOrWhiteSpace($request)) { throw 'Provide a prompt after the command.' }
 
-    $tools = if ($Mode -eq 'write') {
-        @(
-            '--allow-tool=read', '--allow-tool=write', '--allow-tool=shell',
-            '--deny-tool=shell(git push)', '--deny-tool=url', '--deny-tool=memory'
-        )
-    }
-    else {
-        @(
-            '--allow-tool=read', '--allow-tool=shell(git status),shell(git diff)',
-            '--deny-tool=write', '--deny-tool=url', '--deny-tool=memory'
-        )
-    }
+    $tools = @(
+        '--allow-tool=read', '--allow-tool=write', '--allow-tool=shell',
+        '--deny-tool=shell(git push)', '--deny-tool=url', '--deny-tool=memory'
+    )
 
     $copilot = Resolve-Copilot
     $logRoot = Join-Path $HOME '.claude/logs/copilot'
@@ -87,7 +78,7 @@ try {
     if (-not $IsWindows) {
         [IO.Directory]::SetUnixFileMode($logDirectory, [IO.UnixFileMode]'UserRead,UserWrite,UserExecute')
     }
-    [Console]::Error.WriteLine("Copilot CLI ($Mode) log: $logDirectory")
+    [Console]::Error.WriteLine("Copilot CLI (write-enabled) log: $logDirectory")
 
     $arguments = @(
         '--prompt', $request,
@@ -173,7 +164,7 @@ try {
 
     $metadata = [ordered]@{
         timestampUtc = [DateTimeOffset]::UtcNow.ToString('o')
-        mode = $Mode
+        mode = 'write'
         workingDirectory = $info.WorkingDirectory
         copilotExecutable = $copilot
         requestedModel = $model
@@ -196,13 +187,12 @@ try {
     if ($resultMessages.Count -eq 0) { throw 'Copilot completed without a final response.' }
 
     $verifiedModel = if ($parentModel) { $parentModel } else { 'not reported' }
-    $access = if ($Mode -eq 'write') { 'write-enabled' } else { 'read-only' }
-    $report = "**Copilot CLI model:** ``$verifiedModel`` ($access).`n`n" + ($resultMessages -join "`n`n")
+    $report = "**Copilot CLI model:** ``$verifiedModel`` (write-enabled).`n`n" + ($resultMessages -join "`n`n")
     [IO.File]::WriteAllText((Join-Path $logDirectory 'result.md'), $report, [Text.UTF8Encoding]::new($false))
     [Console]::Out.WriteLine($report)
 }
 catch {
-    [Console]::Error.WriteLine("Copilot CLI ($Mode) failed: $($_.Exception.Message)")
+    [Console]::Error.WriteLine("Copilot CLI (write-enabled) failed: $($_.Exception.Message)")
     if ($logDirectory) {
         try {
             [IO.File]::WriteAllText(
