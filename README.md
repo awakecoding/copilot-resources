@@ -2,9 +2,19 @@
 
 Two [Agent Skills](https://code.visualstudio.com/docs/agent-customization/agent-skills) for resumable engineering plans and staged migrations, plus a separate Claude Code plugin that runs GitHub Copilot CLI for independent critiques and general prompts.
 
+## Quick start: install and sign in to Copilot CLI
+
+Install [Claude Code](https://code.claude.com/docs/en/overview) and [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell) (`pwsh`), and make sure your GitHub account has Copilot access. Install GitHub Copilot CLI using **one** of these methods from GitHub's [official installation guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli):
+
+- Windows: `winget install GitHub.Copilot`
+- macOS or Linux: `brew install --cask copilot-cli`
+- Any platform with Node.js 22 or later: `npm install -g @github/copilot`
+
+Check the installation with `copilot --version`, then run `copilot login` in your terminal and follow the browser or device-code sign-in instructions. See GitHub's [authentication guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) for remote/headless environments and other sign-in methods. Ensure `copilot` and `pwsh` are available to the shell that launches Claude Code.
+
 ## Install from the GitHub-hosted Claude Code marketplace
 
-Install [Claude Code](https://code.claude.com/docs/en/overview), GitHub [Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli), and PowerShell 7 (`pwsh`). Authenticate Copilot CLI first with `copilot login`. You need access to this GitHub repository to add its marketplace. Run the following **in your terminal** (not inside a Claude Code prompt), from any directory:
+After the prerequisites above, add the marketplace and install the plugin. You need access to this GitHub repository to add its marketplace. Run the following **in your terminal** (not inside a Claude Code prompt), from any directory:
 
 ```text
 claude plugin marketplace add awakecoding/copilot-resources
