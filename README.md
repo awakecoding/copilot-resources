@@ -37,11 +37,11 @@ The [copilot plugin](plugins/copilot/.claude-plugin/plugin.json) runs GitHub Cop
 
 | Command | Agent | Access |
 |---------|-------|--------|
-| [`/copilot:rubber-duck <review request>`](plugins/copilot/skills/rubber-duck/SKILL.md) | [`copilot-rubber-duck`](plugins/copilot/agents/copilot-rubber-duck.md) | Read-only; verifies that Copilot's built-in rubber-duck subagent produced the critique |
-| [`/copilot:prompt [--model <id>] <prompt>`](plugins/copilot/skills/prompt/SKILL.md) | [`copilot-cli`](plugins/copilot/agents/copilot-cli.md) | Read-only: file reads plus `git status`/`git diff` |
-| [`/copilot:prompt-write [--model <id>] <prompt>`](plugins/copilot/skills/prompt-write/SKILL.md) | [`copilot-cli-write`](plugins/copilot/agents/copilot-cli-write.md) | Can edit files under the working directory and run shell commands except `git push`; URL and memory tools are denied |
+| [`/copilot:rubber-duck <review request>`](plugins/copilot/skills/rubber-duck/SKILL.md) | [`rubber-duck`](plugins/copilot/agents/rubber-duck.md) | Read-only; verifies that Copilot's built-in rubber-duck subagent produced the critique |
+| [`/copilot:prompt [--model <id>] <prompt>`](plugins/copilot/skills/prompt/SKILL.md) | [`prompt`](plugins/copilot/agents/prompt.md) | Read-only: file reads plus `git status`/`git diff` |
+| [`/copilot:prompt-write [--model <id>] <prompt>`](plugins/copilot/skills/prompt-write/SKILL.md) | [`prompt-write`](plugins/copilot/agents/prompt-write.md) | Can edit files under the working directory and run shell commands except `git push`; URL and memory tools are denied |
 
-The bridges require `pwsh` and an authenticated GitHub `copilot` CLI. The [rubber-duck bridge](plugins/copilot/skills/rubber-duck/bridge.ps1) forwards `/rubber-duck <review request>` without selecting a model and checks the JSON events for the actual built-in rubber-duck subagent. The [prompt bridge](plugins/copilot/scripts/copilot-bridge.ps1) lets read-only `/copilot:prompt` select a model with wording such as `Use Grok 4.7 to explain this` or `Explain this using Grok 4.7`. A leading `--model <id>` overrides that selection and remains the way to select a model for `/copilot:prompt-write`. Unrecognized model wording uses the Copilot CLI default; an unsupported selected model produces a CLI error. Each agent hardcodes its bridge mode, so a prompt cannot escalate read-only access to write access. Write mode's shell commands are not sandboxed; avoid running it while Claude is editing the same files. Runs are limited to 480 seconds. Diagnostic logs under `~/.claude/logs/rubber-duck/` and `~/.claude/logs/copilot-cli/` can contain requests, code, and output; keep them private and out of version control.
+The bridges require `pwsh` and an authenticated GitHub `copilot` CLI. The [rubber-duck bridge](plugins/copilot/skills/rubber-duck/bridge.ps1) forwards `/rubber-duck <review request>` without selecting a model and checks the JSON events for the actual built-in rubber-duck subagent. The [prompt bridge](plugins/copilot/scripts/bridge.ps1) lets read-only `/copilot:prompt` select a model with wording such as `Use Grok 4.7 to explain this` or `Explain this using Grok 4.7`. A leading `--model <id>` overrides that selection and remains the way to select a model for `/copilot:prompt-write`. Unrecognized model wording uses the Copilot CLI default; an unsupported selected model produces a CLI error. Each agent hardcodes its bridge mode, so a prompt cannot escalate read-only access to write access. Write mode's shell commands are not sandboxed; avoid running it while Claude is editing the same files. Runs are limited to 480 seconds. Diagnostic logs under `~/.claude/logs/rubber-duck/` and `~/.claude/logs/copilot/` can contain requests, code, and output; keep them private and out of version control. Existing logs under `~/.claude/logs/copilot-cli/` are unaffected.
 
 ### Optional `/rubber-duck` shortcut
 
@@ -54,11 +54,11 @@ description: Shortcut for /copilot:rubber-duck. Ask GitHub Copilot CLI's built-i
 argument-hint: <review request>
 disable-model-invocation: true
 context: fork
-agent: copilot:copilot-rubber-duck
+agent: copilot:rubber-duck
 background: false
 ---
 
-Forward the following complete review request to the `copilot:copilot-rubber-duck` agent's helper **verbatim**. Wait for the helper to finish and return its complete critique in this turn; do not treat a log path or running Bash task as a review result. Do not summarize the request, select a model, or add other context.
+Forward the following complete review request to the `copilot:rubber-duck` agent's helper **verbatim**. Wait for the helper to finish and return its complete critique in this turn; do not treat a log path or running Bash task as a review result. Do not summarize the request, select a model, or add other context.
 
 <review_request>
 $ARGUMENTS

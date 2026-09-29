@@ -81,7 +81,7 @@ try {
     }
 
     $copilot = Resolve-Copilot
-    $logRoot = Join-Path $HOME '.claude/logs/copilot-cli'
+    $logRoot = Join-Path $HOME '.claude/logs/copilot'
     $logDirectory = Join-Path $logRoot ("{0}-{1}" -f [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'), [guid]::NewGuid().ToString('N').Substring(0, 8))
     $null = New-Item -ItemType Directory -Path $logDirectory -Force
     if (-not $IsWindows) {

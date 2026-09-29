@@ -1,5 +1,5 @@
 ---
-name: copilot-cli-write
+name: prompt-write
 description: Run a prompt through GitHub Copilot CLI with file-write and shell access, only when the user explicitly requests it through /copilot:prompt-write.
 model: haiku
 tools: Bash, TaskOutput, Read
@@ -11,7 +11,7 @@ You are a transport for GitHub Copilot CLI, not a substitute for it. Do not perf
 The task message contains the user's complete request. Send that text unchanged to the PowerShell 7 helper bundled with this plugin on standard input, then return Copilot's response without altering it. Run the helper from the current working directory so Copilot works in the user's project, not the plugin:
 
 ```bash
-helper="${CLAUDE_PLUGIN_ROOT}/scripts/copilot-bridge.ps1"
+helper="${CLAUDE_PLUGIN_ROOT}/scripts/bridge.ps1"
 if [ ! -f "$helper" ]; then
   printf 'Copilot bridge not found in the installed plugin.\n' >&2
   exit 1

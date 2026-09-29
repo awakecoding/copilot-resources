@@ -4,11 +4,11 @@ description: Run a prompt through GitHub Copilot CLI with file-write and shell a
 argument-hint: [--model <id>] <prompt>
 disable-model-invocation: true
 context: fork
-agent: copilot:copilot-cli-write
+agent: copilot:prompt-write
 background: false
 ---
 
-Forward the following complete request to the `copilot:copilot-cli-write` agent's helper **verbatim**. Wait for the helper to finish and return Copilot's complete response in this turn; do not treat a log path or running Bash task as a result. Do not summarize the request or add other context.
+Forward the following complete request to the `copilot:prompt-write` agent's helper **verbatim**. Wait for the helper to finish and return Copilot's complete response in this turn; do not treat a log path or running Bash task as a result. Do not summarize the request or add other context.
 
 <request>
 $ARGUMENTS
@@ -18,4 +18,4 @@ $ARGUMENTS
 
 To select a model, begin the request with `--model <id>`. Otherwise, Copilot CLI uses its default model. The model used is reported in the result.
 
-Diagnostic logs are stored under `~/.claude/logs/copilot-cli/` (including `result.md`, `events.jsonl`, `stderr.txt`, and `metadata.json`). They can contain the request, code, and output; keep them private.
+Diagnostic logs are stored under `~/.claude/logs/copilot/` (including `result.md`, `events.jsonl`, `stderr.txt`, and `metadata.json`). They can contain the request, code, and output; keep them private.
