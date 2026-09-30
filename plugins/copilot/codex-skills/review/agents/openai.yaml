@@ -1,0 +1,6 @@
+interface:
+  display_name: "Copilot Review"
+  short_description: "Independent read-only code review by Copilot CLI"
+  default_prompt: "$copilot:review "
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,26 @@
+{
+  "name": "copilot",
+  "version": "1.0.0",
+  "description": "Run GitHub Copilot CLI from Codex: verified read-only reviews, security reviews, rubber-duck critiques, and resumable prompts.",
+  "author": {
+    "name": "awakecoding"
+  },
+  "homepage": "https://github.com/awakecoding/copilot-resources",
+  "repository": "https://github.com/awakecoding/copilot-resources",
+  "keywords": ["copilot", "github-copilot", "code-review", "security-review", "rubber-duck"],
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "GitHub Copilot CLI",
+    "shortDescription": "Ask GitHub Copilot CLI for reviews, critiques, and prompts",
+    "longDescription": "Runs GitHub Copilot CLI as a subprocess in the current project. Use $copilot:review, $copilot:security-review, and $copilot:rubber-duck for independent read-only feedback, or $copilot:prompt for a write-enabled Copilot session that continues across prompts in the same Codex thread.",
+    "developerName": "awakecoding",
+    "category": "Coding",
+    "capabilities": ["Interactive", "Write"],
+    "websiteUrl": "https://github.com/awakecoding/copilot-resources",
+    "defaultPrompt": [
+      "$copilot:review Review my uncommitted changes",
+      "$copilot:rubber-duck Critique the plan above",
+      "$copilot:security-review Check the auth changes on this branch"
+    ]
+  }
+}

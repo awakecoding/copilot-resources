@@ -1,16 +1,18 @@
 # Copilot Resources
 
-A Claude Code plugin that runs GitHub Copilot CLI for independent critiques and general prompts.
+A Claude Code and OpenAI Codex plugin that runs GitHub Copilot CLI for independent critiques and general prompts.
 
 ## Quick start: install and sign in to Copilot CLI
 
-Install [Claude Code](https://code.claude.com/docs/en/overview) and [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell) (`pwsh`), and make sure your GitHub account has Copilot access. Install GitHub Copilot CLI using **one** of these methods from GitHub's [official installation guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli):
+Install [Claude Code](https://code.claude.com/docs/en/overview) or [Codex](https://developers.openai.com/codex), plus [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell) (`pwsh`), and make sure your GitHub account has Copilot access. Install GitHub Copilot CLI using **one** of these methods from GitHub's [official installation guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli):
 
 - Windows: `winget install GitHub.Copilot`
 - macOS or Linux: `brew install --cask copilot-cli`
 - Any platform with Node.js 22 or later: `npm install -g @github/copilot`
 
-Check the installation with `copilot --version`, then run `copilot login` in your terminal and follow the browser or device-code sign-in instructions. See GitHub's [authentication guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) for remote/headless environments and other sign-in methods. Ensure `copilot` and `pwsh` are available to the shell that launches Claude Code.
+Check the installation with `copilot --version`, then run `copilot login` in your terminal and follow the browser or device-code sign-in instructions. See GitHub's [authentication guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) for remote/headless environments and other sign-in methods. Ensure `copilot` and `pwsh` are available to the shell that launches Claude Code or Codex.
+
+For Codex, skip to [Install in OpenAI Codex](#install-in-openai-codex).
 
 ## Install from the GitHub-hosted Claude Code marketplace
 
@@ -87,3 +89,24 @@ $ARGUMENTS
 
 The Copilot subprocess starts in the current working directory and cannot see this Claude conversation. Include any chat-only plan or proposal in the request if you want it reviewed.
 ```
+
+## Install in OpenAI Codex
+
+The same `plugins/copilot` folder is also a Codex plugin: its [Codex manifest](plugins/copilot/.codex-plugin/plugin.json) loads Codex-specific skills from [`codex-skills/`](plugins/copilot/codex-skills), which share the Claude plugin's PowerShell bridges. Run the following **in your terminal** to register the [Codex marketplace](.agents/plugins/marketplace.json) from GitHub:
+
+```text
+codex plugin marketplace add awakecoding/copilot-resources
+```
+
+Then start Codex, open `/plugins`, choose the **Copilot Resources** marketplace, and install **GitHub Copilot CLI**. Start a new Codex thread to load it. Invoke the skills explicitly in a Codex prompt (type `$` to pick them); Codex never runs them implicitly:
+
+| Skill | Purpose and access |
+|-------|--------------------|
+| [`$copilot:rubber-duck <review request>`](plugins/copilot/codex-skills/rubber-duck/SKILL.md) | Independent read-only critique from Copilot's built-in rubber-duck subagent |
+| [`$copilot:review <review request>`](plugins/copilot/codex-skills/review/SKILL.md) | Read-only code review by Copilot's built-in code reviewer |
+| [`$copilot:security-review <review request>`](plugins/copilot/codex-skills/security-review/SKILL.md) | Read-only security review by Copilot's built-in security reviewer |
+| [`$copilot:prompt [--model <id>] [--new \| --resume <id>] <prompt>`](plugins/copilot/codex-skills/prompt/SKILL.md) | General write-enabled Copilot prompt, continued across prompts in the same Codex thread and working directory |
+
+Copilot CLI needs network access and writes to `~/.copilot`, so Codex's sandbox usually asks you to approve the command the first time. Prompt continuity is keyed on Codex's `CODEX_THREAD_ID`; the session mapping is stored under `$CODEX_HOME/copilot/` (default `~/.codex/copilot/`). Diagnostic logs go to `$CODEX_HOME/logs/copilot/` and `$CODEX_HOME/logs/rubber-duck/`; keep them private. As with Claude, Copilot cannot see the Codex conversation, so include any chat-only context in the request. Rubber-duck critiques can run for up to 90 minutes.
+
+To pick up changes on GitHub, run `codex plugin marketplace upgrade copilot-resources`, then reinstall or update the plugin from `/plugins` and start a new thread. To try a local checkout instead, run `codex plugin marketplace add ./` from the repository root.

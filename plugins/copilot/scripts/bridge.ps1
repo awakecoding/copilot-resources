@@ -1,7 +1,8 @@
 param(
     [ValidateSet('review', 'security-review')][string]$ReviewType,
-    [string]$ClaudeSessionId,
+    [Alias('ClaudeSessionId')][string]$ConversationId,
     [string]$StateDirectory,
+    [ValidateSet('claude', 'codex')][string]$AgentHost = 'claude',
     [switch]$Heredoc,
     [ValidateRange(1, 480)][int]$TimeoutSeconds = 480
 )
@@ -10,6 +11,20 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $logDirectory = $null
 $metadata = $null
+
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+if ($AgentHost -eq 'codex') {
+    $hostName = 'Codex'
+    $conversationField = 'codexThreadId'
+    $promptCommand = '$copilot:prompt'
+    $logRoot = Join-Path $codexHome 'logs/copilot'
+}
+else {
+    $hostName = 'Claude'
+    $conversationField = 'claudeSessionId'
+    $promptCommand = '/copilot:prompt'
+    $logRoot = Join-Path $HOME '.claude/logs/copilot'
+}
 
 function Resolve-Copilot {
     $command = Get-Command copilot -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -50,17 +65,24 @@ function Save-SessionState($Path, $State) {
 $stateLock = $null
 try {
     if (-not $ReviewType) {
-        $parsedId = [guid]::Empty
-        if (-not [guid]::TryParse($ClaudeSessionId, [ref]$parsedId) -or -not $StateDirectory) {
-            throw 'A Claude session ID and plugin data directory are required for /copilot:prompt.'
+        if ($AgentHost -eq 'codex') {
+            if (-not $ConversationId) { $ConversationId = $env:CODEX_THREAD_ID }
+            if (-not $StateDirectory) { $StateDirectory = Join-Path $codexHome 'copilot' }
         }
-        $ClaudeSessionId = $parsedId.ToString()
+        $parsedId = [guid]::Empty
+        if (-not [guid]::TryParse($ConversationId, [ref]$parsedId) -or -not $StateDirectory) {
+            $idName = if ($AgentHost -eq 'codex') { 'Codex thread ID (CODEX_THREAD_ID)' } else { 'Claude session ID' }
+            throw "A $idName and plugin data directory are required for $promptCommand."
+        }
+        $ConversationId = $parsedId.ToString()
     }
-    elseif ($ClaudeSessionId -or $StateDirectory) {
-        throw 'Reviews use independent sessions; do not supply Claude session state.'
+    elseif ($ConversationId -or $StateDirectory) {
+        throw "Reviews use independent sessions; do not supply $hostName session state."
     }
 
-    $request = [Console]::In.ReadToEnd()
+    $stdin = [IO.StreamReader]::new([Console]::OpenStandardInput(), [Text.UTF8Encoding]::new($false))
+    try { $request = $stdin.ReadToEnd() }
+    finally { $stdin.Dispose() }
     if ($Heredoc) {
         if ($request.EndsWith("`r`n")) { $request = $request.Substring(0, $request.Length - 2) }
         elseif ($request.EndsWith("`n")) { $request = $request.Substring(0, $request.Length - 1) }
@@ -143,7 +165,7 @@ try {
     if (-not $ReviewType) {
         $normalizedDirectory = if ($IsWindows) { $workingDirectory.ToUpperInvariant() } else { $workingDirectory }
         $key = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
-            [Text.Encoding]::UTF8.GetBytes("$ClaudeSessionId`n$normalizedDirectory")
+            [Text.Encoding]::UTF8.GetBytes("$ConversationId`n$normalizedDirectory")
         )).ToLowerInvariant()
         $sessionsDirectory = Join-Path ([IO.Path]::GetFullPath($StateDirectory)) 'sessions'
         $null = New-Item -ItemType Directory -Path $sessionsDirectory -Force
@@ -155,11 +177,11 @@ try {
             $stateLock = [IO.FileStream]::new("$statePath.lock", [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
         }
         catch [IO.IOException] {
-            throw 'Another Copilot prompt is using this Claude conversation and workspace; wait for it to finish.'
+            throw "Another Copilot prompt is using this $hostName conversation and workspace; wait for it to finish."
         }
         if ([IO.File]::Exists($statePath)) {
             $state = ConvertFrom-Json -InputObject ([IO.File]::ReadAllText($statePath)) -AsHashtable
-            if ($state.claudeSessionId -ne $ClaudeSessionId -or
+            if ($state[$conversationField] -ne $ConversationId -or
                 $state.workingDirectory -ne $normalizedDirectory -or
                 $state.sessionIds -isnot [array] -or
                 $state.activeSessionId -notin $state.sessionIds) {
@@ -167,11 +189,11 @@ try {
             }
         }
         else {
-            $state = @{ claudeSessionId = $ClaudeSessionId; workingDirectory = $normalizedDirectory; activeSessionId = $null; sessionIds = @() }
+            $state = @{ $conversationField = $ConversationId; workingDirectory = $normalizedDirectory; activeSessionId = $null; sessionIds = @() }
         }
         if ($sessionAction -eq 'resume') {
             if ($resumeId -notin $state.sessionIds) {
-                throw "Copilot session $resumeId is not recorded for this Claude conversation and workspace."
+                throw "Copilot session $resumeId is not recorded for this $hostName conversation and workspace."
             }
             $targetSessionId = $resumeId
         }
@@ -183,7 +205,6 @@ try {
             $targetSessionId = $state.activeSessionId
         }
     }
-    $logRoot = Join-Path $HOME '.claude/logs/copilot'
     $logDirectory = Join-Path $logRoot ("{0}-{1}" -f [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'), [guid]::NewGuid().ToString('N').Substring(0, 8))
     $null = New-Item -ItemType Directory -Path $logDirectory -Force
     if (-not $IsWindows) {
@@ -313,7 +334,8 @@ try {
         reviewType = $ReviewType
         workingDirectory = $info.WorkingDirectory
         copilotExecutable = $copilot
-        claudeSessionId = $ClaudeSessionId
+        agentHost = $AgentHost
+        $conversationField = $ConversationId
         sessionAction = if ($ReviewType) { 'independent' } else { $sessionAction }
         sessionId = $resultSessionId
         requestedModel = $model

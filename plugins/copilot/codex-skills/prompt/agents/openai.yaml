@@ -1,0 +1,6 @@
+interface:
+  display_name: "Copilot Prompt"
+  short_description: "Run a write-enabled GitHub Copilot CLI prompt"
+  default_prompt: "$copilot:prompt "
+policy:
+  allow_implicit_invocation: false
