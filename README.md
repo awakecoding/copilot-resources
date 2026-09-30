@@ -92,7 +92,17 @@ The Copilot subprocess starts in the current working directory and cannot see th
 
 ## Install in OpenAI Codex
 
-The same `plugins/copilot` folder is also a Codex plugin: its [Codex manifest](plugins/copilot/.codex-plugin/plugin.json) loads Codex-specific skills from [`codex-skills/`](plugins/copilot/codex-skills), which share the Claude plugin's PowerShell bridges. Run the following **in your terminal** to register the [Codex marketplace](.agents/plugins/marketplace.json) from GitHub:
+The same `plugins/copilot` folder is also a Codex plugin: its [Codex manifest](plugins/copilot/.codex-plugin/plugin.json) loads Codex-specific skills from [`codex-skills/`](plugins/copilot/codex-skills), which share the Claude plugin's PowerShell bridges.
+
+To install from the Codex desktop app, open **Customize > Plugins**, choose **Add > Add marketplace**, and enter:
+
+| Field | Value |
+|-------|-------|
+| Source | `awakecoding/copilot-resources` |
+| Git ref | `master` |
+| Sparse paths | `.agents/plugins` and `plugins/copilot` (one path per line) |
+
+Add the marketplace, select **Copilot Resources**, and install **GitHub Copilot CLI**. If you prefer the terminal, you can instead register the same [Codex marketplace](.agents/plugins/marketplace.json) from GitHub with:
 
 ```text
 codex plugin marketplace add awakecoding/copilot-resources
