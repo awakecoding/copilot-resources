@@ -16,10 +16,11 @@ This repository ships one plugin, `plugins/copilot`, that runs GitHub Copilot CL
 | `plugins/copilot/codex-skills/*/agents/openai.yaml` | Codex | Skill UI metadata; `allow_implicit_invocation: false` keeps them explicit-only |
 | `plugins/copilot/scripts/bridge.ps1` | Both | Shared bridge for `prompt`, `review`, and `security-review` |
 | `plugins/copilot/skills/rubber-duck/bridge.ps1` | Both | Rubber-duck bridge |
+| `tools/Test-PluginParity.ps1` | Repo | Validation and Claude/Codex parity check (run by CI) |
 
 ## Conventions
 
-- **Keep hosts in sync.** A behavior change to one command usually needs matching edits in the Claude skill, the Claude agent, the Codex skill, and `README.md`.
+- **Keep hosts in sync.** A behavior change to one command usually needs matching edits in the Claude skill, the Claude agent, the Codex skill, and `README.md`. `tools/Test-PluginParity.ps1` enforces the structural parts; wording stays a manual review item.
 - **Bridges are host-aware through `-AgentHost claude|codex`** (default `claude`). Claude behavior, paths, and state keys (`claudeSessionId`, `~/.claude/logs/...`) must stay backward compatible. Codex uses `CODEX_THREAD_ID`, `$CODEX_HOME` (default `~/.codex`) for logs, and `$CODEX_HOME/copilot` for prompt session state. Do not name a parameter `$Host`; it is a PowerShell automatic variable.
 - **Wrappers are transports, not reviewers.** Skills and agents must pass the user's request verbatim on stdin (single-quoted heredoc with `-Heredoc`, or a PowerShell here-string), run from the user's working directory, and relay the bridge's stdout unchanged. They must never perform the review or prompt themselves.
 - **Timeouts:** the shared bridge caps Copilot at 480 s, and the rubber-duck bridge at 5400 s. Wrapper wait instructions must exceed these.
@@ -29,21 +30,13 @@ This repository ships one plugin, `plugins/copilot`, that runs GitHub Copilot CL
 
 ## Validation
 
-There is no build or test suite. Before committing:
+There is no build or unit-test suite. Before committing, run the validation script (CI runs it on every push and pull request via `.github/workflows/validate.yml`):
 
 ```powershell
-# JSON manifests
-'.agents/plugins/marketplace.json','.claude-plugin/marketplace.json','plugins/copilot/.claude-plugin/plugin.json','plugins/copilot/.codex-plugin/plugin.json' |
-  ForEach-Object { $null = Get-Content -Raw $_ | ConvertFrom-Json }
-
-# PowerShell syntax
-'plugins/copilot/scripts/bridge.ps1','plugins/copilot/skills/rubber-duck/bridge.ps1' | ForEach-Object {
-  $errors = $null
-  $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $_), [ref]$null, [ref]$errors)
-  if ($errors) { throw "$_ has parse errors" }
-}
+./tools/Test-PluginParity.ps1
 ```
 
+It parses every manifest and `.ps1` file and fails when the hosts drift: a command missing a Claude skill, Claude agent, Codex skill, or `openai.yaml`; mismatched names, bridge scripts, or `-ReviewType`; a Codex invocation without `-AgentHost codex`; explicit-only invocation not enforced; or differing plugin names, versions, or marketplace sources. Bump `version` in both plugin manifests together. When adding a command, add all four files and extend the script if the new command introduces another host-shared parameter.
 For bridge changes, smoke-test both hosts from a scratch directory (requires `copilot` signed in). Point `CODEX_HOME` and `-StateDirectory` at temporary paths to avoid polluting real state:
 
 ```powershell
