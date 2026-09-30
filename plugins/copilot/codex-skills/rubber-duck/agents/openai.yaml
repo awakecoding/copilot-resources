@@ -1,0 +1,6 @@
+interface:
+  display_name: "Copilot Rubber Duck"
+  short_description: "Independent critique from Copilot CLI's rubber duck"
+  default_prompt: "$copilot:rubber-duck "
+policy:
+  allow_implicit_invocation: false
