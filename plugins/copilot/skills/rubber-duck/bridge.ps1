@@ -1,6 +1,6 @@
 param(
     [switch]$Heredoc,
-    [ValidateSet('claude', 'codex')][string]$AgentHost = 'claude',
+    [ValidateSet('claude', 'codex', 'cursor')][string]$AgentHost = 'claude',
     [ValidateRange(1, 5400)][int]$TimeoutSeconds = 5400
 )
 
@@ -47,6 +47,7 @@ try {
         $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
         Join-Path $codexHome 'logs/rubber-duck'
     }
+    elseif ($AgentHost -eq 'cursor') { Join-Path $HOME '.cursor/logs/rubber-duck' }
     else { Join-Path $HOME '.claude/logs/rubber-duck' }
     $logDirectory = Join-Path $logRoot ("{0}-{1}" -f [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'), [guid]::NewGuid().ToString('N').Substring(0, 8))
     $null = New-Item -ItemType Directory -Path $logDirectory -Force

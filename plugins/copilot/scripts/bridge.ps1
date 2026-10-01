@@ -2,7 +2,7 @@ param(
     [ValidateSet('review', 'security-review')][string]$ReviewType,
     [Alias('ClaudeSessionId')][string]$ConversationId,
     [string]$StateDirectory,
-    [ValidateSet('claude', 'codex')][string]$AgentHost = 'claude',
+    [ValidateSet('claude', 'codex', 'cursor')][string]$AgentHost = 'claude',
     [switch]$Heredoc,
     [ValidateRange(1, 480)][int]$TimeoutSeconds = 480
 )
@@ -13,11 +13,18 @@ $logDirectory = $null
 $metadata = $null
 
 $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
+$cursorHome = Join-Path $HOME '.cursor'
 if ($AgentHost -eq 'codex') {
     $hostName = 'Codex'
     $conversationField = 'codexThreadId'
     $promptCommand = '$copilot:prompt'
     $logRoot = Join-Path $codexHome 'logs/copilot'
+}
+elseif ($AgentHost -eq 'cursor') {
+    $hostName = 'Cursor'
+    $conversationField = 'cursorSessionId'
+    $promptCommand = '$copilot:prompt'
+    $logRoot = Join-Path $cursorHome 'logs/copilot'
 }
 else {
     $hostName = 'Claude'
@@ -69,9 +76,16 @@ try {
             if (-not $ConversationId) { $ConversationId = $env:CODEX_THREAD_ID }
             if (-not $StateDirectory) { $StateDirectory = Join-Path $codexHome 'copilot' }
         }
+        elseif ($AgentHost -eq 'cursor') {
+            if (-not $StateDirectory) { $StateDirectory = Join-Path $cursorHome 'copilot' }
+        }
         $parsedId = [guid]::Empty
         if (-not [guid]::TryParse($ConversationId, [ref]$parsedId) -or -not $StateDirectory) {
-            $idName = if ($AgentHost -eq 'codex') { 'Codex thread ID (CODEX_THREAD_ID)' } else { 'Claude session ID' }
+            $idName = switch ($AgentHost) {
+                'codex' { 'Codex thread ID (CODEX_THREAD_ID)' }
+                'cursor' { 'Cursor conversation ID (-ConversationId)' }
+                default { 'Claude session ID' }
+            }
             throw "A $idName and plugin data directory are required for $promptCommand."
         }
         $ConversationId = $parsedId.ToString()
