@@ -1,6 +1,6 @@
 {
   "name": "copilot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Run GitHub Copilot CLI from Claude Code: verified read-only reviews, resumable prompts, and rubber-duck critiques",
   "author": {
     "name": "awakecoding"

@@ -1,6 +1,6 @@
 # Copilot Resources
 
-A Claude Code and OpenAI Codex plugin that runs GitHub Copilot CLI for independent critiques and general prompts.
+A Claude Code, OpenAI Codex, and Cursor plugin that runs GitHub Copilot CLI for independent critiques and general prompts.
 
 ## Quick start: install and sign in to Copilot CLI
 
@@ -10,9 +10,9 @@ Install [Claude Code](https://code.claude.com/docs/en/overview) or [Codex](https
 - macOS or Linux: `brew install --cask copilot-cli`
 - Any platform with Node.js 22 or later: `npm install -g @github/copilot`
 
-Check the installation with `copilot --version`, then run `copilot login` in your terminal and follow the browser or device-code sign-in instructions. See GitHub's [authentication guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) for remote/headless environments and other sign-in methods. Ensure `copilot` and `pwsh` are available to the shell that launches Claude Code or Codex.
+Check the installation with `copilot --version`, then run `copilot login` in your terminal and follow the browser or device-code sign-in instructions. See GitHub's [authentication guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) for remote/headless environments and other sign-in methods. Ensure `copilot` and `pwsh` are available to the shell that launches Claude Code, Codex, or Cursor.
 
-For Codex, skip to [Install in OpenAI Codex](#install-in-openai-codex).
+For Codex, skip to [Install in OpenAI Codex](#install-in-openai-codex). For Cursor, skip to [Install in Cursor](#install-in-cursor).
 
 ## Install from the GitHub-hosted Claude Code marketplace
 
@@ -120,3 +120,23 @@ Then start Codex, open `/plugins`, choose the **Copilot Resources** marketplace,
 Copilot CLI needs network access and writes to `~/.copilot`, so Codex's sandbox usually asks you to approve the command the first time. Prompt continuity is keyed on Codex's `CODEX_THREAD_ID`; the session mapping is stored under `$CODEX_HOME/copilot/` (default `~/.codex/copilot/`). Diagnostic logs go to `$CODEX_HOME/logs/copilot/` and `$CODEX_HOME/logs/rubber-duck/`; keep them private. As with Claude, Copilot cannot see the Codex conversation, so include any chat-only context in the request. Rubber-duck critiques can run for up to 90 minutes.
 
 To pick up changes on GitHub, run `codex plugin marketplace upgrade copilot-resources`, then reinstall or update the plugin from `/plugins` and start a new thread. To try a local checkout instead, run `codex plugin marketplace add ./` from the repository root.
+
+## Install in Cursor
+
+The same `plugins/copilot` folder is also a Cursor plugin: its [Cursor manifest](plugins/copilot/.cursor-plugin/plugin.json) loads Cursor-specific skills from [`cursor-skills/`](plugins/copilot/cursor-skills) and slash commands from [`commands/`](plugins/copilot/commands), which share the Claude plugin's PowerShell bridges. The manifest sets `skills` explicitly so Cursor never loads the Claude skills, and sets `agents` to an empty list so the Claude transport agents are not exposed as Cursor agents.
+
+Cursor has no self-serve public marketplace manifest like Claude Code or Codex; its official marketplace is curated by the Cursor team. Install one of these ways:
+
+- **Team marketplace (Teams/Enterprise):** in the Cursor dashboard, open **Plugins & MCPs > Add Marketplace > Import from Repo**, enter `awakecoding/copilot-resources`, and install the **GitHub Copilot CLI** plugin for your team.
+- **Direct install:** in Cursor, open the plugin panel under **Customize**, choose to add a plugin from a repository or local folder, and point it at `awakecoding/copilot-resources` (or a local checkout's `plugins/copilot` folder). Restart Cursor to load it.
+
+Type `/` in Cursor to find the copilot commands:
+
+| Command | Purpose and access |
+|---------|--------------------|
+| [`/copilot:rubber-duck <review request>`](plugins/copilot/commands/rubber-duck.md) | Independent read-only critique from Copilot's built-in rubber-duck subagent |
+| [`/copilot:review <review request>`](plugins/copilot/commands/review.md) | Read-only code review by Copilot's built-in code reviewer |
+| [`/copilot:security-review <review request>`](plugins/copilot/commands/security-review.md) | Read-only security review by Copilot's built-in security reviewer |
+| [`/copilot:prompt [--model <id>] [--new \| --resume <id>] <prompt>`](plugins/copilot/commands/prompt.md) | General write-enabled Copilot prompt, continued across prompts in the same Cursor conversation and working directory |
+
+Copilot CLI needs network access and writes to `~/.copilot`, so Cursor's sandbox usually asks you to approve the command the first time. Cursor does not yet expose a stable conversation ID to plugins, so the prompt skill generates a UUID once per Cursor conversation and passes it to the bridge with `-ConversationId`; the session mapping is stored under `~/.cursor/copilot/`. Diagnostic logs go to `~/.cursor/logs/copilot/` and `~/.cursor/logs/rubber-duck/`; keep them private. As with Claude and Codex, Copilot cannot see the Cursor conversation, so include any chat-only context in the request. Rubber-duck critiques can run for up to 90 minutes.
